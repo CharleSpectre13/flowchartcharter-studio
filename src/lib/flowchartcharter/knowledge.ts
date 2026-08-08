@@ -1,4 +1,4 @@
-/** Brain-1 ontology for Studio — distilled from Drive + mind map + Advanced Blueprint. */
+/** Brain-1 ontology for Studio — Advanced Blueprint + Muscle-Memory VDB. */
 
 export interface Foundation {
   id: string;
@@ -41,10 +41,12 @@ export const FOUNDATIONS: Foundation[] = [
   {
     id: "muscle_memory",
     name: "Muscle-Memory Loop",
-    description: "Repeated runs + checkpoint history harden the path (QueryMuscleMemory).",
-    mechanism: "Vector store of successful completions replaces open-graph RAG under pressure.",
-    role: "All agents · Boss Agent",
-    metric: "Precedent hit-rate · weight convergence",
+    description:
+      "Vector DB of verified execution trajectories — not unstructured GraphRAG chunks.",
+    mechanism:
+      "Four quadrants: state_vector · flow_path · Q_ent · prompt_tweak. HIT → accelerated path.",
+    role: "All agents · Boss Agent · QueryMuscleMemory",
+    metric: "Hit rate · trajectory reuse · latency vs GraphRAG",
     rhythm: "Cheat codes from history",
   },
   {
@@ -59,10 +61,10 @@ export const FOUNDATIONS: Foundation[] = [
   {
     id: "monday_sync",
     name: "Monday Morning Sync",
-    description: "Downtime RLAIF — fitness, promote/demote/fire, re-weight paths.",
-    mechanism: "TriggerMondayMorningSync + AdjustCorporateRoster skills.",
+    description: "Downtime RLAIF — fitness, promote/demote/fire, re-weight + commit memories.",
+    mechanism: "TriggerMondayMorningSync re-ingests successful_runs into Muscle-Memory VDB.",
     role: "Boss Agent (GM)",
-    metric: "F(x) vs industry benchmark",
+    metric: "F(x) vs industry benchmark · VDB growth",
     rhythm: "Idle compute → fleet optimization",
   },
 ];
@@ -74,7 +76,7 @@ export const MIND_MAP = [
     items: [
       "Execution-first vs GraphRAG retrieval-first",
       "Charter owns the journey",
-      "Deterministic Flow Units",
+      "Muscle-Memory beats open-graph RAG",
       "Coach Trust Hand-Off",
     ],
   },
@@ -85,7 +87,7 @@ export const MIND_MAP = [
       "Charter",
       "Flow Units",
       "Rhythm Markers",
-      "Muscle-Memory Loop",
+      "Muscle-Memory Vector DB",
       "Engineer Exit",
       "Monday Morning Sync",
     ],
@@ -93,7 +95,14 @@ export const MIND_MAP = [
   {
     id: "hierarchy",
     title: "Corporate Hierarchy",
-    items: ["CEO", "CFO (token economics)", "Board", "Boss Agent / GM", "Position Managers", "Key Players"],
+    items: [
+      "CEO",
+      "CFO (token economics)",
+      "Board",
+      "Boss Agent / GM",
+      "Position Managers",
+      "Key Players",
+    ],
   },
   {
     id: "ops",
@@ -101,7 +110,7 @@ export const MIND_MAP = [
     items: [
       "Blackboard JSON only",
       "BSP super-steps",
-      "Voluntary bind",
+      "QueryMuscleMemory HIT/MISS",
       "Five agent skills",
       "CFO budget matrix",
     ],
@@ -113,17 +122,17 @@ export const MIND_MAP = [
       "|ψ⟩ = Σ cᵢ|FlowUnitᵢ⟩",
       "H_ctx contextual entropy",
       "Q_s = exp(−k·D)",
+      "Cosine state_vector match",
       "F(x) fitness score",
-      "CFO path-cost interrupt",
     ],
   },
   {
     id: "goals",
     title: "Strategic Goals",
     items: [
-      "Engineer happiness & exit",
+      "Zero-hallucination playbooks",
+      "Sub-second accelerated paths",
       "Token/latency savings",
-      "Industry benchmark lift",
       "Open design standard",
     ],
   },
@@ -152,13 +161,39 @@ export const QUANTUM = {
   superposition: "|ψ⟩ = Σ cᵢ |FlowUnitᵢ⟩ · affinity(H_ctx)",
   measurement: "|ExecutedPath⟩ = M|ψ⟩  (CFO matrix pre-gate)",
   synergy: "Q_s = exp(−k · D)",
-  note: "cᵢ from Muscle-Memory · H_ctx → cleansing bias · M = Charter @ Rhythm Marker",
+  note: "HIT on Muscle-Memory skips collapse — replay verified flow_path",
 };
 
 export const SKILL_CATALOG = [
-  { name: "QueryMuscleMemory", purpose: "Precedent cheat-codes (replaces open RAG)" },
+  {
+    name: "QueryMuscleMemory",
+    purpose: "Trajectory cheat-codes (state · path · Q_ent · tweak)",
+  },
   { name: "EvaluateRhythmMarker", purpose: "Schema self-audit · Q_s gate" },
   { name: "ExecuteQuantumCollapse", purpose: "Tensor routing decision engine" },
-  { name: "TriggerMondayMorningSync", purpose: "Downtime RLAIF + re-weights" },
+  { name: "TriggerMondayMorningSync", purpose: "RLAIF + VDB re-ingest" },
   { name: "AdjustCorporateRoster", purpose: "PROMOTE | DEMOTE | FIRE" },
+];
+
+export const MUSCLE_MEMORY_QUADRANTS = [
+  {
+    name: "State Embedding",
+    field: "state_vector",
+    desc: "entropy · size_kb · complexity · error_weight",
+  },
+  {
+    name: "Contextual Action",
+    field: "successful_flow_path",
+    desc: "Ordered Flow Units that solved this job",
+  },
+  {
+    name: "Synergy Fingerprint",
+    field: "entanglement_score",
+    desc: "Q_entanglement of the team run",
+  },
+  {
+    name: "Cheat Code",
+    field: "prompt_tweak",
+    desc: "Prompt/format insight that saved the day",
+  },
 ];
