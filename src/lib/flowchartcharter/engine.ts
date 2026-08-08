@@ -1,3 +1,5 @@
+/** Studio runtime — includes QuantumRouter (mirrors packages/core/quantum.py). */
+
 export type AgentStatus = "Active" | "Promoted" | "Demoted" | "Fired";
 
 export interface ExecutionMetrics {
@@ -46,6 +48,23 @@ export interface ExecVector {
   [key: string]: unknown;
 }
 
+export interface PathAmp {
+  path: string;
+  c: number;
+  p: number;
+  weight: number;
+}
+
+export interface QuantumCollapse {
+  agent: string;
+  chosenPath: string;
+  confidence: number;
+  preEntropy: number;
+  amplitudes: PathAmp[];
+  marker: string;
+  quality?: number;
+}
+
 export interface CharterRun {
   workload: string;
   quality: number;
@@ -56,6 +75,9 @@ export interface CharterRun {
   auditPassed: boolean;
   governanceApproved: boolean;
   vectors: ExecVector[];
+  collapses: QuantumCollapse[];
+  entanglement: number;
+  meanPreEntropy: number;
 }
 
 export interface SystemSnapshot {
@@ -69,7 +91,14 @@ export interface SystemSnapshot {
   step: number;
   tokenSpend: number;
   tokenBudget: number;
+  lastCollapses: QuantumCollapse[];
 }
+
+const PATHS = ["path_A", "path_B"] as const;
+const COST_NORM = 300;
+const QUALITY_FLOOR = 0.9;
+const LR = 0.12;
+const DECAY = 0.02;
 
 function uid() {
   return Math.random().toString(36).slice(2, 10);
@@ -77,6 +106,80 @@ function uid() {
 
 function rand(min: number, max: number) {
   return min + Math.random() * (max - min);
+}
+
+// ── Quantum core (TypeScript port) ──────────────────────────────────────────
+
+function shannonEntropy(probs: number[]): number {
+  let ent = 0;
+  for (const p of probs) {
+    if (p > 1e-15) ent -= p * Math.log2(p);
+  }
+  return ent;
+}
+
+export function buildSuperposition(muscle: Record<string, number>): {
+  amplitudes: PathAmp[];
+  entropy: number;
+  dominant: string;
+} {
+  const raw = PATHS.map((p) => Math.max(1e-9, muscle[p] ?? 1));
+  const total = raw.reduce((s, w) => s + w, 0);
+  const amplitudes: PathAmp[] = PATHS.map((p, i) => ({
+    path: p,
+    c: Math.sqrt(raw[i]),
+    p: raw[i] / total,
+    weight: raw[i],
+  }));
+  const entropy = shannonEntropy(amplitudes.map((a) => a.p));
+  const dominant = amplitudes.reduce((b, a) => (a.p > b.p ? a : b)).path;
+  return { amplitudes, entropy, dominant };
+}
+
+/** M|ψ⟩ — deterministic enterprise collapse (argmax probability). */
+export function measure(muscle: Record<string, number>): {
+  chosen: string;
+  pre: ReturnType<typeof buildSuperposition>;
+} {
+  const pre = buildSuperposition(muscle);
+  return { chosen: pre.dominant, pre };
+}
+
+/** Reinforce cᵢ after quality outcome. */
+export function reinforce(
+  muscle: Record<string, number>,
+  path: string,
+  quality: number,
+): Record<string, number> {
+  const updated: Record<string, number> = { ...muscle };
+  for (const p of PATHS) {
+    updated[p] = Math.max(0.05, updated[p] ?? 1);
+  }
+  if (quality >= QUALITY_FLOOR) {
+    updated[path] = Math.min(8, updated[path] * (1 + LR * quality));
+    for (const p of PATHS) {
+      if (p !== path) updated[p] = Math.max(0.05, updated[p] * (1 - DECAY));
+    }
+  } else {
+    const penalty = LR * (QUALITY_FLOOR - quality + 0.1);
+    updated[path] = Math.max(0.05, updated[path] * (1 - penalty));
+    for (const p of PATHS) {
+      if (p !== path) updated[p] = Math.min(8, updated[p] * (1 + DECAY * 2));
+    }
+  }
+  return updated;
+}
+
+export function entanglementScore(qualities: number[]): number {
+  if (!qualities.length) return 0;
+  if (qualities.length === 1) return qualities[0];
+  let sum = 0;
+  for (let i = 0; i < qualities.length - 1; i++) {
+    const u = Math.min(1, Math.max(0, qualities[i]));
+    const d = Math.min(1, Math.max(0, qualities[i + 1]));
+    sum += Math.sqrt(u * d);
+  }
+  return sum / (qualities.length - 1);
 }
 
 export function createRoster(): Agent[] {
@@ -87,7 +190,7 @@ export function createRoster(): Agent[] {
       role: "Key Player — Data Extraction",
       status: "Active",
       history: [],
-      muscleMemory: { path_A: 1, path_B: 1 },
+      muscleMemory: { path_A: 1.4, path_B: 0.9 },
       corporateRank: 1,
       load: 0,
       capability: { extraction: 1, general: 0.5 },
@@ -100,7 +203,7 @@ export function createRoster(): Agent[] {
       role: "Key Player — Validation",
       status: "Active",
       history: [],
-      muscleMemory: { path_A: 1, path_B: 1 },
+      muscleMemory: { path_A: 1.0, path_B: 1.2 },
       corporateRank: 1,
       load: 0,
       capability: { validation: 1, general: 0.5 },
@@ -113,7 +216,7 @@ export function createRoster(): Agent[] {
       role: "Position Manager — Synthesizer",
       status: "Active",
       history: [],
-      muscleMemory: { path_A: 1.2, path_B: 0.8 },
+      muscleMemory: { path_A: 1.5, path_B: 0.7 },
       corporateRank: 2,
       load: 0,
       capability: { synthesis: 1, general: 0.6 },
@@ -136,8 +239,6 @@ export function createRoster(): Agent[] {
   ];
 }
 
-const COST_NORM = 300;
-
 export function fitness(history: ExecutionMetrics[]): number {
   if (!history.length) return 0;
   const n = history.length;
@@ -147,17 +248,6 @@ export function fitness(history: ExecutionMetrics[]): number {
   const sy = history.reduce((s, m) => s + m.synergyScore, 0) / n;
   const rhythm = t > 0 ? 1 / t : 0;
   return 0.4 * q + 0.3 * rhythm - 0.15 * (c / COST_NORM) + 0.2 * sy;
-}
-
-function pickPath(agent: Agent): string {
-  const paths = ["path_A", "path_B"] as const;
-  const total = paths.reduce((s, p) => s + (agent.muscleMemory[p] ?? 1), 0);
-  let r = Math.random() * total;
-  for (const p of paths) {
-    r -= agent.muscleMemory[p] ?? 1;
-    if (r <= 0) return p;
-  }
-  return "path_A";
 }
 
 function executeUnit(agent: Agent, qualityBias = 0): ExecutionMetrics {
@@ -191,6 +281,31 @@ function rhythmAudit(
   };
 }
 
+function collapseForAgent(
+  agent: Agent,
+  marker: string,
+  qualityBias = 0,
+): { collapse: QuantumCollapse; metrics: ExecutionMetrics } {
+  const { chosen, pre } = measure(agent.muscleMemory);
+  const metrics = executeUnit(agent, qualityBias);
+  agent.muscleMemory = reinforce(agent.muscleMemory, chosen, metrics.qualityScore);
+  const collapse: QuantumCollapse = {
+    agent: agent.name,
+    chosenPath: chosen,
+    confidence: 1,
+    preEntropy: Number(pre.entropy.toFixed(4)),
+    amplitudes: pre.amplitudes.map((a) => ({
+      path: a.path,
+      c: Number(a.c.toFixed(4)),
+      p: Number(a.p.toFixed(4)),
+      weight: Number(a.weight.toFixed(4)),
+    })),
+    marker,
+    quality: Number(metrics.qualityScore.toFixed(4)),
+  };
+  return { collapse, metrics };
+}
+
 export function runCharter(
   roster: Agent[],
   workload: string,
@@ -210,12 +325,18 @@ export function runCharter(
 
   const metrics: ExecutionMetrics[] = [];
   const pathByAgent: Record<string, string> = {};
+  const collapses: QuantumCollapse[] = [];
+  const qualities: number[] = [];
+
   for (const a of roster) {
     if (a.status === "Fired" || a.layer !== "ops") continue;
-    const path = pickPath(a);
-    pathByAgent[a.name] = path;
-    metrics.push(executeUnit(a));
+    const { collapse, metrics: m } = collapseForAgent(a, "superstep");
+    pathByAgent[a.name] = collapse.chosenPath;
+    collapses.push(collapse);
+    metrics.push(m);
+    qualities.push(m.qualityScore);
   }
+
   let quality = metrics.length
     ? metrics.reduce((s, m) => s + m.qualityScore, 0) / metrics.length
     : 0;
@@ -228,7 +349,10 @@ export function runCharter(
     const batch: ExecutionMetrics[] = [];
     for (const a of roster) {
       if (a.status === "Fired" || a.layer !== "ops") continue;
-      batch.push(executeUnit(a, 0.12));
+      const { collapse, metrics: m } = collapseForAgent(a, `remediate#${loops}`, 0.12);
+      collapses.push(collapse);
+      batch.push(m);
+      qualities.push(m.qualityScore);
     }
     metrics.push(...batch);
     quality = batch.reduce((s, m) => s + m.qualityScore, 0) / Math.max(batch.length, 1);
@@ -258,6 +382,11 @@ export function runCharter(
     notes: trust ? "hand-off approved" : "hand-off withheld",
   });
 
+  const meanPreEntropy =
+    collapses.length > 0
+      ? collapses.reduce((s, c) => s + c.preEntropy, 0) / collapses.length
+      : 0;
+
   return {
     run: {
       workload,
@@ -269,6 +398,9 @@ export function runCharter(
       auditPassed: Boolean(audit.passed),
       governanceApproved: trust,
       vectors: vectors.slice(-6),
+      collapses,
+      entanglement: Number(entanglementScore(qualities).toFixed(4)),
+      meanPreEntropy: Number(meanPreEntropy.toFixed(4)),
     },
     vectors,
     tokenSpend: nextSpend,
@@ -307,9 +439,10 @@ export function mondayMorningSync(
       playbook.push(`Fire ${a.name}: F=${f.toFixed(3)}`);
     } else {
       a.status = "Active";
-      a.muscleMemory.path_A = Math.max(0.1, (a.muscleMemory.path_A ?? 1) + rand(-0.05, 0.15));
       outcomes[a.name] = "RETAINED";
-      playbook.push(`Retain ${a.name}: F=${f.toFixed(3)}`);
+      playbook.push(
+        `Retain ${a.name}: F=${f.toFixed(3)} · ψ weights A=${(a.muscleMemory.path_A ?? 1).toFixed(2)} B=${(a.muscleMemory.path_B ?? 1).toFixed(2)}`,
+      );
     }
   }
 
@@ -367,6 +500,7 @@ export function initialSnapshot(): SystemSnapshot {
     step: 0,
     tokenSpend: 0,
     tokenBudget: 50_000,
+    lastCollapses: [],
   };
 }
 

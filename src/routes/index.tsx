@@ -22,6 +22,7 @@ import {
   mondayMorningSync,
   runCharter,
   type ExecVector,
+  type QuantumCollapse,
   type SystemSnapshot,
 } from "@/lib/flowchartcharter/engine";
 import {
@@ -44,7 +45,7 @@ function StudioPage() {
   const [activePhase, setActivePhase] = useState(0);
   const [tab, setTab] = useState<Tab>("live");
   const [log, setLog] = useState<string[]>([
-    "Cycle 3 — Drive blueprints + mind map + foundations incorporated.",
+    "Quantum routing online — |ψ⟩ → M|ψ⟩ collapse at super-step · muscle-memory reinforce.",
   ]);
   const [busy, setBusy] = useState(false);
 
@@ -89,9 +90,23 @@ function StudioPage() {
       const runs = [...prev.runs, run];
       const trustRate = runs.filter((r) => r.trust).length / runs.length;
       pushLog(
-        `CHARTER "${workload}" · Q=${run.quality.toFixed(3)} · audit=${run.auditPassed} · trust=${run.trust}`,
+        `CHARTER "${workload}" · Q=${run.quality.toFixed(3)} · collapses=${run.collapses.length} · Q_ent=${run.entanglement} · trust=${run.trust}`,
       );
-      return { ...prev, roster, runs, vectors, tokenSpend, trustRate, step: prev.step + 1 };
+      for (const c of run.collapses.filter((x) => x.marker === "superstep")) {
+        pushLog(
+          `  M|ψ⟩ ${c.agent} → ${c.chosenPath} (H=${c.preEntropy} → 0 · conf=1.0)`,
+        );
+      }
+      return {
+        ...prev,
+        roster,
+        runs,
+        vectors,
+        tokenSpend,
+        trustRate,
+        step: prev.step + 1,
+        lastCollapses: run.collapses,
+      };
     });
     setBusy(false);
   }
@@ -136,10 +151,11 @@ function StudioPage() {
   function onReset() {
     setSnap(initialSnapshot());
     setActivePhase(0);
-    setLog(["Reset — fresh roster, empty executive wire."]);
+    setLog(["Reset — fresh roster, empty |ψ⟩ amplitudes."]);
   }
 
   const recentVectors = [...snap.vectors].reverse().slice(0, 8);
+  const collapses = snap.lastCollapses.filter((c) => c.marker === "superstep");
 
   return (
     <div className="min-h-screen bg-bg text-fg">
@@ -152,7 +168,7 @@ function StudioPage() {
             <div>
               <div className="text-sm font-semibold tracking-tight">FlowChartCharter Studio</div>
               <div className="text-xs text-muted">
-                Execution-first · Follow rather than search · Cycle 3
+                Quantum routing · |ψ⟩ → M|ψ⟩ · Cycle 4
               </div>
             </div>
           </div>
@@ -190,8 +206,8 @@ function StudioPage() {
                   <h1 className="text-lg font-semibold">Charter map</h1>
                 </div>
                 <p className="mb-4 text-sm leading-relaxed text-muted">
-                  Deterministic playbook with RhythmAudit gates. Executives speak only in typed JSON
-                  vectors. GraphRAG is a callable sub-flow — never the default.
+                  At ST-03 each agent builds |ψ⟩ from muscle-memory, then the Charter measures
+                  M|ψ⟩ → one definitive path (confidence 1.0). Outcomes reinforce amplitudes.
                 </p>
                 <ol className="grid gap-2 sm:grid-cols-2">
                   {PHASES.map((p, i) => {
@@ -251,71 +267,101 @@ function StudioPage() {
                   icon={<Shield className="h-4 w-4" />}
                   label="Coach trust rate"
                   value={`${Math.round(snap.trustRate * 100)}%`}
-                  hint="Earned Engineering Trust"
+                  hint="Board GovernanceVector hand-off"
                 />
                 <MetricCard
                   icon={<Activity className="h-4 w-4" />}
-                  label="Avg ops fitness"
-                  value={avgFitness.toFixed(3)}
-                  hint={FITNESS_EQ}
+                  label="Entanglement Q"
+                  value={lastRun ? lastRun.entanglement.toFixed(3) : "—"}
+                  hint="Team synergy across sequential units"
                 />
                 <MetricCard
                   icon={<Briefcase className="h-4 w-4" />}
-                  label="Token spend"
-                  value={`${snap.tokenSpend.toLocaleString()} / ${snap.tokenBudget.toLocaleString()}`}
-                  hint="CFO BudgetVector"
+                  label="Pre-measure entropy"
+                  value={lastRun ? lastRun.meanPreEntropy.toFixed(3) : "—"}
+                  hint="H(|ψ⟩) before collapse → 0 after M"
                 />
               </div>
+            </section>
+
+            <section className="rounded-xl border border-border bg-surface p-5">
+              <h2 className="mb-1 text-sm font-semibold uppercase tracking-wide text-muted">
+                Quantum path collapse
+              </h2>
+              <p className="mb-3 font-mono text-[11px] text-muted">
+                {QUANTUM.superposition} · {QUANTUM.measurement}
+              </p>
+              {collapses.length === 0 ? (
+                <p className="text-sm text-muted">
+                  Run a charter to watch |ψ⟩ amplitudes collapse into definitive paths.
+                </p>
+              ) : (
+                <ul className="grid gap-3 sm:grid-cols-3">
+                  {collapses.map((c) => (
+                    <CollapseCard key={`${c.agent}-${c.marker}`} c={c} />
+                  ))}
+                </ul>
+              )}
             </section>
 
             <section className="grid gap-4 lg:grid-cols-2">
               <div className="rounded-xl border border-border bg-surface p-5">
                 <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted">
-                  Corporate hierarchy
+                  Roster · muscle memory
                 </h2>
-                <div className="mx-auto flex max-w-xs flex-col items-center gap-1.5">
-                  {HIERARCHY_PYRAMID.map((r, i) => (
-                    <div
-                      key={r.role}
-                      className="rounded-md border border-border bg-surface-2 py-2 text-center text-xs font-medium"
-                      style={{ width: `${100 - i * 10}%` }}
-                    >
-                      {r.role}
-                    </div>
-                  ))}
-                  <div className="mt-2 text-center text-[11px] text-muted">
-                    Head Coach (you) · step back without stepping out
-                  </div>
-                </div>
-                <div className="mt-4 grid gap-2 sm:grid-cols-2">
-                  {[
-                    ["CEO", snap.executives.ceo, "StrategyVector"],
-                    ["CFO", snap.executives.cfo, "BudgetVector"],
-                    ["Board", snap.executives.board, "GovernanceVector"],
-                    ["GM", snap.executives.gm, "OpsVector"],
-                  ].map(([t, n, v]) => (
-                    <div key={t} className="rounded-lg border border-border bg-surface-2 px-3 py-2">
-                      <div className="text-[11px] font-semibold text-primary">{t}</div>
-                      <div className="text-sm">{n}</div>
-                      <div className="font-mono text-[10px] text-muted">{v}</div>
-                    </div>
-                  ))}
-                </div>
+                <ul className="space-y-2">
+                  {snap.roster.map((a) => {
+                    const f = fitness(a.history);
+                    const total =
+                      (a.muscleMemory.path_A ?? 1) + (a.muscleMemory.path_B ?? 1);
+                    const pA = ((a.muscleMemory.path_A ?? 1) / total) * 100;
+                    return (
+                      <li
+                        key={a.id}
+                        className="rounded-lg border border-border bg-surface-2 px-3 py-2.5"
+                      >
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div>
+                            <div className="text-sm font-medium">{a.name}</div>
+                            <div className="text-xs text-muted">{a.role}</div>
+                          </div>
+                          <div className="text-right font-mono text-xs text-muted">
+                            {a.status}
+                            {a.talentEligible && a.history.length ? ` · F=${f.toFixed(3)}` : ""}
+                          </div>
+                        </div>
+                        {a.layer === "ops" && (
+                          <div className="mt-2">
+                            <div className="mb-0.5 flex justify-between font-mono text-[10px] text-muted">
+                              <span>path_A {(a.muscleMemory.path_A ?? 1).toFixed(2)}</span>
+                              <span>path_B {(a.muscleMemory.path_B ?? 1).toFixed(2)}</span>
+                            </div>
+                            <div className="flex h-1.5 overflow-hidden rounded-full bg-bg">
+                              <div
+                                className="bg-primary transition-all"
+                                style={{ width: `${pA}%` }}
+                              />
+                              <div
+                                className="bg-accent/80 transition-all"
+                                style={{ width: `${100 - pA}%` }}
+                              />
+                            </div>
+                          </div>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
               </div>
 
               <div className="rounded-xl border border-border bg-surface p-5">
                 <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted">
-                  Quantum path · executive wire
+                  Executive wire
                 </h2>
-                <div className="mb-3 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2 font-mono text-[11px] text-muted">
-                  <div>{QUANTUM.superposition}</div>
-                  <div className="text-primary">{QUANTUM.measurement}</div>
-                  <div className="mt-1 opacity-80">{QUANTUM.note}</div>
-                </div>
                 {recentVectors.length === 0 ? (
                   <p className="text-sm text-muted">Run a charter to stream typed vectors.</p>
                 ) : (
-                  <ul className="max-h-52 space-y-1.5 overflow-auto">
+                  <ul className="max-h-72 space-y-1.5 overflow-auto">
                     {recentVectors.map((v, i) => (
                       <li
                         key={`${v.type}-${i}`}
@@ -326,42 +372,12 @@ function StudioPage() {
                     ))}
                   </ul>
                 )}
-              </div>
-            </section>
-
-            <section className="grid gap-4 lg:grid-cols-2">
-              <div className="rounded-xl border border-border bg-surface p-5">
-                <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted">Roster</h2>
-                <ul className="space-y-2">
-                  {snap.roster.map((a) => {
-                    const f = fitness(a.history);
-                    return (
-                      <li
-                        key={a.id}
-                        className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border bg-surface-2 px-3 py-2.5"
-                      >
-                        <div>
-                          <div className="text-sm font-medium">{a.name}</div>
-                          <div className="text-xs text-muted">
-                            {a.role} · {a.layer}
-                          </div>
-                        </div>
-                        <div className="text-right font-mono text-xs text-muted">
-                          {a.status}
-                          {a.talentEligible && a.history.length ? ` · F=${f.toFixed(3)}` : ""}
-                        </div>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </div>
-              <div className="rounded-xl border border-border bg-surface p-5">
-                <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted">
+                <h2 className="mb-2 mt-4 text-sm font-semibold uppercase tracking-wide text-muted">
                   Event log
                 </h2>
-                <ul className="max-h-64 space-y-1 overflow-auto font-mono text-xs text-muted">
+                <ul className="max-h-40 space-y-1 overflow-auto font-mono text-xs text-muted">
                   {log.map((line, i) => (
-                    <li key={i} className="border-b border-border/50 py-1.5">
+                    <li key={i} className="border-b border-border/50 py-1">
                       <ArrowRight className="mr-1 inline h-3 w-3 text-primary" />
                       {line}
                     </li>
@@ -376,76 +392,55 @@ function StudioPage() {
           <section className="space-y-4">
             <div className="rounded-xl border border-border bg-surface p-5">
               <h1 className="mb-1 text-lg font-semibold">Foundational structures</h1>
-              <p className="mb-4 text-sm text-muted">
-                From Drive spreadsheet + Architectural Spec — the DNA of FlowChartCharter.
-              </p>
+              <p className="mb-4 text-sm text-muted">DNA of FlowChartCharter + quantum measurement model.</p>
               <div className="grid gap-3 md:grid-cols-2">
                 {FOUNDATIONS.map((f) => (
-                  <article
-                    key={f.id}
-                    className="rounded-lg border border-border bg-surface-2 p-4"
-                  >
+                  <article key={f.id} className="rounded-lg border border-border bg-surface-2 p-4">
                     <h3 className="text-sm font-semibold text-primary">{f.name}</h3>
                     <p className="mt-1 text-xs leading-relaxed text-muted">{f.description}</p>
-                    <dl className="mt-3 space-y-1.5 text-[11px]">
-                      <div>
-                        <dt className="font-semibold text-fg/80">Mechanism</dt>
-                        <dd className="text-muted">{f.mechanism}</dd>
-                      </div>
-                      <div>
-                        <dt className="font-semibold text-fg/80">Hierarchy</dt>
-                        <dd className="text-muted">{f.role}</dd>
-                      </div>
-                      <div>
-                        <dt className="font-semibold text-fg/80">Metric</dt>
-                        <dd className="text-muted">{f.metric}</dd>
-                      </div>
-                      <div>
-                        <dt className="font-semibold text-fg/80">Rhythm goal</dt>
-                        <dd className="text-muted">{f.rhythm}</dd>
-                      </div>
-                    </dl>
+                    <p className="mt-2 text-[11px] text-muted">
+                      <span className="font-semibold text-fg/80">Mechanism · </span>
+                      {f.mechanism}
+                    </p>
                   </article>
                 ))}
               </div>
             </div>
-
             <div className="grid gap-4 lg:grid-cols-2">
               <div className="rounded-xl border border-border bg-surface p-5">
                 <h2 className="mb-3 text-sm font-semibold text-primary">Flow Unit Blueprint</h2>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs">
-                    <thead className="text-muted">
-                      <tr className="border-b border-border">
-                        <th className="py-2 pr-2">Element</th>
-                        <th className="py-2 pr-2">Function</th>
-                        <th className="py-2">Contract</th>
+                <table className="w-full text-left text-xs">
+                  <thead className="text-muted">
+                    <tr className="border-b border-border">
+                      <th className="py-2 pr-2">Element</th>
+                      <th className="py-2 pr-2">Function</th>
+                      <th className="py-2">Contract</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {FLOW_UNIT_BLUEPRINT.map((row) => (
+                      <tr key={row.element} className="border-b border-border/60">
+                        <td className="py-2 pr-2 font-mono text-primary">{row.element}</td>
+                        <td className="py-2 pr-2 text-muted">{row.fn}</td>
+                        <td className="py-2 text-muted">{row.contract}</td>
                       </tr>
-                    </thead>
-                    <tbody>
-                      {FLOW_UNIT_BLUEPRINT.map((row) => (
-                        <tr key={row.element} className="border-b border-border/60">
-                          <td className="py-2 pr-2 font-mono text-primary">{row.element}</td>
-                          <td className="py-2 pr-2 text-muted">{row.fn}</td>
-                          <td className="py-2 text-muted">{row.contract}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                    ))}
+                  </tbody>
+                </table>
               </div>
               <div className="rounded-xl border border-border bg-surface p-5">
-                <h2 className="mb-3 text-sm font-semibold text-primary">Playbook vs Library</h2>
-                <ul className="space-y-2 text-sm text-muted">
-                  <li className="rounded-lg border border-border bg-surface-2 px-3 py-2">
-                    <span className="font-semibold text-fg">GraphRAG (Library)</span> — retrieval-first,
-                    open nodes, token bloat, execution drift.
-                  </li>
-                  <li className="rounded-lg border border-primary/40 bg-primary/10 px-3 py-2">
-                    <span className="font-semibold text-primary">FlowChartCharter (Playbook)</span> —
-                    execution-first, pre-approved Flow Units, type-safe Blackboard, Coach Trust Hand-Off.
-                  </li>
-                </ul>
+                <h2 className="mb-3 text-sm font-semibold text-primary">Hierarchy</h2>
+                <div className="mx-auto flex max-w-xs flex-col items-center gap-1.5">
+                  {HIERARCHY_PYRAMID.map((r, i) => (
+                    <div
+                      key={r.role}
+                      className="rounded-md border border-border bg-surface-2 py-2 text-center text-xs font-medium"
+                      style={{ width: `${100 - i * 10}%` }}
+                    >
+                      {r.role}
+                    </div>
+                  ))}
+                </div>
                 <p className="mt-4 font-mono text-[11px] text-muted">{FITNESS_EQ}</p>
               </div>
             </div>
@@ -456,16 +451,10 @@ function StudioPage() {
           <section className="space-y-4">
             <div className="rounded-xl border border-border bg-surface p-5">
               <h1 className="mb-1 text-lg font-semibold">FlowChartCharter Engineering</h1>
-              <p className="mb-5 text-sm text-muted">
-                Mind map communities (Brain 1 knowledge graph) — structural precision over parameter
-                scale.
-              </p>
+              <p className="mb-5 text-sm text-muted">Brain 1 communities — structural precision over parameter scale.</p>
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 {MIND_MAP.map((branch) => (
-                  <div
-                    key={branch.id}
-                    className="rounded-xl border border-border bg-surface-2 p-4"
-                  >
+                  <div key={branch.id} className="rounded-xl border border-border bg-surface-2 p-4">
                     <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-primary">
                       {branch.title}
                     </div>
@@ -473,7 +462,7 @@ function StudioPage() {
                       {branch.items.map((item) => (
                         <li
                           key={item}
-                          className="rounded-md border border-border/80 bg-bg/40 px-2.5 py-1.5 text-xs text-fg/90"
+                          className="rounded-md border border-border/80 bg-bg/40 px-2.5 py-1.5 text-xs"
                         >
                           {item}
                         </li>
@@ -483,24 +472,51 @@ function StudioPage() {
                 ))}
               </div>
             </div>
-            <div className="rounded-xl border border-border bg-surface p-5 text-sm text-muted">
-              <p>
-                Sources: Google Drive Blueprint · Head Coach Guide · Architectural Spec · System Design ·
-                Structure spreadsheet · IMG mind map · hierarchy playbook.
-              </p>
-              <p className="mt-2">
-                GraphRAG remains a <span className="text-primary">callable sub-flow</span> for pure
-                relational discovery. The Charter owns the journey.
-              </p>
-            </div>
           </section>
         )}
 
         <footer className="border-t border-border pb-8 pt-4 text-center text-xs text-muted">
-          Cycle 3 · graph-engineering Brain 1 · advanced-agent-builder · advanced-coding · open design
+          Cycle 4 · QuantumRouter · |ψ⟩ = Σ cᵢ|FlowUnitᵢ⟩ · M = Charter @ RhythmMarker
         </footer>
       </main>
     </div>
+  );
+}
+
+function CollapseCard({ c }: { c: QuantumCollapse }) {
+  return (
+    <li className="rounded-lg border border-border bg-surface-2 p-3">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-sm font-medium">{c.agent}</span>
+        <span className="rounded bg-primary/15 px-2 py-0.5 font-mono text-[10px] text-primary">
+          {c.chosenPath}
+        </span>
+      </div>
+      <div className="mt-1 font-mono text-[10px] text-muted">
+        H={c.preEntropy} → 0 · conf={c.confidence}
+        {c.quality != null ? ` · Q=${c.quality}` : ""}
+      </div>
+      <div className="mt-2 space-y-1">
+        {c.amplitudes.map((a) => (
+          <div key={a.path}>
+            <div className="mb-0.5 flex justify-between font-mono text-[10px] text-muted">
+              <span>
+                {a.path} c={a.c}
+              </span>
+              <span>p={a.p}</span>
+            </div>
+            <div className="h-1 overflow-hidden rounded-full bg-bg">
+              <div
+                className={
+                  a.path === c.chosenPath ? "h-full bg-primary" : "h-full bg-muted/40"
+                }
+                style={{ width: `${Math.round(a.p * 100)}%` }}
+              />
+            </div>
+          </div>
+        ))}
+      </div>
+    </li>
   );
 }
 
@@ -551,7 +567,7 @@ function MetricCard({
         <span className="text-xs font-medium uppercase tracking-wide text-muted">{label}</span>
       </div>
       <div className="text-2xl font-semibold tracking-tight">{value}</div>
-      <div className="mt-1 break-words text-[10px] text-muted">{hint}</div>
+      <div className="mt-1 text-[10px] text-muted">{hint}</div>
     </div>
   );
 }
