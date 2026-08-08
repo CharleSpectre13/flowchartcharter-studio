@@ -1,624 +1,408 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
-  Activity,
   ArrowRight,
-  Briefcase,
-  CheckCircle2,
-  GitBranch,
-  Layers,
-  Network,
+  Eraser,
   Play,
   RefreshCw,
-  Shield,
+  Sparkles,
   Users,
+  Wallet,
   Zap,
-  Wrench,
 } from "lucide-react";
 import {
-  AGENT_SKILLS,
-  PHASES,
-  WORKLOADS,
-  fitness,
-  initialSnapshot,
+  PRESET_JOBS,
+  clearLogs,
+  createDashboard,
+  executeWorkload,
+  fitnessScore,
   mondayMorningSync,
-  runCharter,
-  type ExecVector,
-  type QuantumCollapse,
-  type SystemSnapshot,
-} from "@/lib/flowchartcharter/engine";
-import {
-  FITNESS_EQ,
-  FLOW_UNIT_BLUEPRINT,
-  FOUNDATIONS,
-  HIERARCHY_PYRAMID,
-  MIND_MAP,
-  QUANTUM,
-  SKILL_CATALOG,
-} from "@/lib/flowchartcharter/knowledge";
+  type DashboardState,
+  type LogKind,
+  type RosterAgent,
+} from "@/lib/flowchartcharter/dashboard";
 
 export const Route = createFileRoute("/")({
-  component: StudioPage,
+  component: MasterDashboard,
 });
 
-type Tab = "live" | "blueprint" | "mindmap";
-
-function StudioPage() {
-  const [snap, setSnap] = useState<SystemSnapshot>(() => initialSnapshot());
-  const [activePhase, setActivePhase] = useState(0);
-  const [tab, setTab] = useState<Tab>("live");
-  const [log, setLog] = useState<string[]>([
-    "Tensor routing online — H_ctx · CFO matrix · five agent skills · Q_s = exp(−kD).",
-  ]);
+function MasterDashboard() {
+  const [state, setState] = useState<DashboardState>(() => createDashboard());
   const [busy, setBusy] = useState(false);
+  const logEnd = useRef<HTMLDivElement>(null);
 
-  const lastRun = snap.runs[snap.runs.length - 1];
+  useEffect(() => {
+    logEnd.current?.scrollIntoView({ behavior: "smooth" });
+  }, [state.logs.length]);
 
-  const avgFitness = useMemo(() => {
-    const ops = snap.roster.filter((a) => a.talentEligible && a.history.length);
-    if (!ops.length) return 0;
-    return ops.reduce((s, a) => s + fitness(a.history), 0) / ops.length;
-  }, [snap.roster]);
-
-  function pushLog(line: string) {
-    setLog((prev) => [line, ...prev].slice(0, 48));
-  }
-
-  async function animatePhases(until: number) {
-    for (let i = 0; i <= until; i++) {
-      setActivePhase(i);
-      await new Promise((r) => setTimeout(r, 140));
-    }
-  }
-
-  async function onRunCharter() {
+  async function onGo() {
     if (busy) return;
     setBusy(true);
-    setTab("live");
-    const workload = WORKLOADS[snap.runs.length % WORKLOADS.length];
-    await animatePhases(5);
-    setSnap((prev) => {
-      const roster = prev.roster.map((a) => ({
-        ...a,
-        history: [...a.history],
-        muscleMemory: { ...a.muscleMemory },
-      }));
-      const { run, vectors, tokenSpend, skillsUsed } = runCharter(
-        roster,
-        workload,
-        prev.vectors,
-        prev.tokenSpend,
-        prev.tokenBudget,
-      );
-      const runs = [...prev.runs, run];
-      const trustRate = runs.filter((r) => r.trust).length / runs.length;
-      pushLog(
-        `CHARTER "${workload}" · Q=${run.quality.toFixed(3)} · H_ctx=${run.contextEntropy.toFixed(3)} · Q_s=${run.qsMean.toFixed(3)} · trust=${run.trust}`,
-      );
-      for (const c of run.collapses.filter((x) => x.marker === "superstep")) {
-        pushLog(
-          `  M|ψ⟩ ${c.agent} → ${c.chosenPath}${c.cfoForced ? " [CFO]" : ""} (H=${c.preEntropy} · H_ctx=${c.contextEntropy})`,
-        );
-      }
-      return {
-        ...prev,
-        roster,
-        runs,
-        vectors,
-        tokenSpend,
-        trustRate,
-        step: prev.step + 1,
-        lastCollapses: run.collapses,
-        skillsUsed,
-      };
-    });
+    await sleep(180);
+    setState((s) => executeWorkload(s));
     setBusy(false);
   }
 
   async function onSync() {
     if (busy) return;
     setBusy(true);
-    setTab("live");
-    await animatePhases(6);
-    setSnap((prev) => {
-      const roster = prev.roster.map((a) => ({
-        ...a,
-        history: [...a.history],
-        muscleMemory: { ...a.muscleMemory },
-      }));
-      const last = prev.runs[prev.runs.length - 1];
-      const { outcomes, playbook, vectors } = mondayMorningSync(
-        roster,
-        prev.vectors,
-        prev.tokenSpend,
-        prev.tokenBudget,
-        last?.trust ?? false,
-        last?.quality ?? 0,
-      );
-      pushLog(
-        `MONDAY SYNC · TriggerMondayMorningSync · ${Object.entries(outcomes)
-          .map(([k, v]) => `${k}:${v}`)
-          .join(" · ") || "stable"}`,
-      );
-      return {
-        ...prev,
-        roster,
-        syncOutcomes: outcomes,
-        playbook: [...playbook, ...prev.playbook].slice(0, 24),
-        vectors,
-        step: prev.step + 1,
-        skillsUsed: [...AGENT_SKILLS],
-      };
-    });
+    await sleep(220);
+    setState((s) => mondayMorningSync(s));
     setBusy(false);
   }
 
   function onReset() {
-    setSnap(initialSnapshot());
-    setActivePhase(0);
-    setLog(["Reset — fresh roster, empty |ψ⟩ amplitudes."]);
+    setState(createDashboard());
   }
 
-  const recentVectors = [...snap.vectors].reverse().slice(0, 8);
-  const collapses = snap.lastCollapses.filter((c) => c.marker === "superstep");
+  const activePlayers = state.roster.filter((a) => a.status !== "FIRED").length;
 
   return (
-    <div className="min-h-screen bg-bg text-fg">
-      <header className="sticky top-0 z-20 border-b border-border bg-surface/90 backdrop-blur">
+    <div className="flex min-h-full flex-col bg-bg text-fg">
+      {/* Top bar */}
+      <header className="sticky top-0 z-20 border-b border-border bg-surface/95 backdrop-blur">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-3">
           <div className="flex items-center gap-3">
-            <div className="grid h-9 w-9 place-items-center rounded-lg bg-primary/15 text-primary">
-              <GitBranch className="h-5 w-5" />
-            </div>
+            <span className="pulse-dot inline-block h-3 w-3 rounded-full bg-ok" />
             <div>
-              <div className="text-sm font-semibold tracking-tight">FlowChartCharter Studio</div>
-              <div className="text-xs text-muted">
-                Advanced Blueprint · Tensor routing · Cycle 5
-              </div>
+              <h1 className="text-base font-bold tracking-tight sm:text-lg">
+                FlowChartCharter
+                <span className="ml-2 rounded border border-primary/40 bg-primary/10 px-2 py-0.5 font-mono text-[10px] font-medium uppercase tracking-widest text-primary">
+                  Game Desk v1
+                </span>
+              </h1>
+              <p className="text-xs text-muted">
+                Press GO — the robots follow the map
+              </p>
             </div>
           </div>
-          <nav className="flex flex-wrap gap-1 rounded-lg border border-border bg-surface-2 p-1">
-            {(
-              [
-                ["live", "Live", Play],
-                ["blueprint", "Blueprint", Layers],
-                ["mindmap", "Mind map", Network],
-              ] as const
-            ).map(([id, label, Icon]) => (
-              <button
-                key={id}
-                type="button"
-                onClick={() => setTab(id)}
-                className={`inline-flex min-h-10 items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium ${
-                  tab === id ? "bg-primary text-primary-fg" : "text-muted hover:text-fg"
-                }`}
-              >
-                <Icon className="h-3.5 w-3.5" />
-                {label}
-              </button>
-            ))}
-          </nav>
+          <div className="flex flex-wrap items-center gap-3 text-xs text-muted">
+            <span>
+              Coach: <strong className="text-fg">You</strong>
+            </span>
+            <span>
+              Rhythm:{" "}
+              <strong className="text-ok">
+                {state.rhythm === "idle" ? "Ready" : state.rhythm === "running" ? "Running…" : "Sync…"}
+              </strong>
+            </span>
+            <span className="font-mono text-primary">
+              Runs {state.runs} · Hits {state.hits}
+            </span>
+          </div>
         </div>
       </header>
 
-      <main className="mx-auto max-w-6xl space-y-6 px-4 py-6">
-        {tab === "live" && (
-          <>
-            <section className="grid gap-4 md:grid-cols-[1.4fr_1fr]">
-              <div className="rounded-xl border border-border bg-surface p-5">
-                <div className="mb-3 flex items-center gap-2 text-primary">
-                  <Zap className="h-4 w-4" />
-                  <h1 className="text-lg font-semibold">Charter map</h1>
-                </div>
-                <p className="mb-4 text-sm leading-relaxed text-muted">
-                  Tensor-Based Routing: muscle-memory × contextual entropy × CFO budget matrix,
-                  then M collapses |ψ⟩ to one path (confidence 1.0). Five agent skills drive the loop.
-                </p>
-                <ol className="grid gap-2 sm:grid-cols-2">
-                  {PHASES.map((p, i) => {
-                    const active = i === activePhase;
-                    const done = i < activePhase || (lastRun && i <= 5);
-                    return (
-                      <li
-                        key={p.id}
-                        className={`flex items-center gap-3 rounded-lg border px-3 py-2.5 text-sm ${
-                          active
-                            ? "border-primary/50 bg-primary/10"
-                            : done
-                              ? "border-border bg-surface-2"
-                              : "border-border/60 text-muted"
-                        }`}
-                      >
-                        <span className="font-mono text-xs text-primary">{p.id}</span>
-                        <span className="flex-1">{p.name}</span>
-                        {done ? <CheckCircle2 className="h-3.5 w-3.5 text-ok" /> : null}
-                      </li>
-                    );
-                  })}
-                </ol>
-                <div className="mt-5 flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    disabled={busy}
-                    onClick={onRunCharter}
-                    className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-fg disabled:opacity-50"
-                  >
-                    <Play className="h-4 w-4" />
-                    Run charter
-                  </button>
-                  <button
-                    type="button"
-                    disabled={busy || snap.runs.length === 0}
-                    onClick={onSync}
-                    className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-border bg-surface-2 px-4 py-2.5 text-sm disabled:opacity-50"
-                  >
-                    <Users className="h-4 w-4" />
-                    Monday morning sync
-                  </button>
-                  <button
-                    type="button"
-                    disabled={busy}
-                    onClick={onReset}
-                    className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-border px-4 py-2.5 text-sm text-muted disabled:opacity-50"
-                  >
-                    <RefreshCw className="h-4 w-4" />
-                    Reset
-                  </button>
-                </div>
-              </div>
-
-              <div className="grid gap-4">
-                <MetricCard
-                  icon={<Shield className="h-4 w-4" />}
-                  label="Coach trust rate"
-                  value={`${Math.round(snap.trustRate * 100)}%`}
-                  hint="Board GovernanceVector hand-off"
-                />
-                <MetricCard
-                  icon={<Activity className="h-4 w-4" />}
-                  label="H_ctx · Q_s"
-                  value={
-                    lastRun
-                      ? `${lastRun.contextEntropy.toFixed(2)} · ${lastRun.qsMean.toFixed(2)}`
-                      : "—"
-                  }
-                  hint="Context entropy · schema synergy"
-                />
-                <MetricCard
-                  icon={<Briefcase className="h-4 w-4" />}
-                  label="Avg fitness F"
-                  value={avgFitness ? avgFitness.toFixed(3) : "—"}
-                  hint="Talent management signal"
-                />
-              </div>
-            </section>
-
-            <section className="rounded-xl border border-border bg-surface p-5">
-              <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">
-                  Quantum path collapse
-                </h2>
-                <div className="flex flex-wrap gap-1">
-                  {(snap.skillsUsed.length ? snap.skillsUsed : AGENT_SKILLS).map((s) => (
-                    <span
-                      key={s}
-                      className="rounded-full border border-border bg-surface-2 px-2 py-0.5 font-mono text-[10px] text-muted"
-                    >
-                      {s}
-                    </span>
-                  ))}
-                </div>
-              </div>
-              <p className="mb-3 font-mono text-[11px] text-muted">
-                {QUANTUM.superposition} · {QUANTUM.measurement} · {QUANTUM.synergy}
-              </p>
-              {collapses.length === 0 ? (
-                <p className="text-sm text-muted">
-                  Run a charter — messy workloads raise H_ctx and bias toward path_B (cleansing).
-                </p>
-              ) : (
-                <ul className="grid gap-3 sm:grid-cols-3">
-                  {collapses.map((c) => (
-                    <CollapseCard key={`${c.agent}-${c.marker}`} c={c} />
-                  ))}
-                </ul>
-              )}
-            </section>
-
-            <section className="grid gap-4 lg:grid-cols-2">
-              <div className="rounded-xl border border-border bg-surface p-5">
-                <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted">
-                  Roster · muscle memory (A / B / lite)
-                </h2>
-                <ul className="space-y-2">
-                  {snap.roster.map((a) => {
-                    const f = fitness(a.history);
-                    const wA = a.muscleMemory.path_A ?? 1;
-                    const wB = a.muscleMemory.path_B ?? 1;
-                    const wL = a.muscleMemory.path_lite ?? 1;
-                    const total = wA + wB + wL;
-                    return (
-                      <li
-                        key={a.id}
-                        className="rounded-lg border border-border bg-surface-2 px-3 py-2.5"
-                      >
-                        <div className="flex flex-wrap items-center justify-between gap-2">
-                          <div>
-                            <div className="text-sm font-medium">{a.name}</div>
-                            <div className="text-xs text-muted">{a.role}</div>
-                          </div>
-                          <div className="text-right font-mono text-xs text-muted">
-                            {a.status}
-                            {a.talentEligible && a.history.length ? ` · F=${f.toFixed(3)}` : ""}
-                          </div>
-                        </div>
-                        {a.layer === "ops" && (
-                          <div className="mt-2">
-                            <div className="mb-0.5 flex justify-between font-mono text-[10px] text-muted">
-                              <span>A {wA.toFixed(2)}</span>
-                              <span>B {wB.toFixed(2)}</span>
-                              <span>lite {wL.toFixed(2)}</span>
-                            </div>
-                            <div className="flex h-1.5 overflow-hidden rounded-full bg-bg">
-                              <div
-                                className="bg-primary transition-all"
-                                style={{ width: `${(wA / total) * 100}%` }}
-                              />
-                              <div
-                                className="bg-accent/80 transition-all"
-                                style={{ width: `${(wB / total) * 100}%` }}
-                              />
-                              <div
-                                className="bg-muted/60 transition-all"
-                                style={{ width: `${(wL / total) * 100}%` }}
-                              />
-                            </div>
-                          </div>
-                        )}
-                      </li>
-                    );
-                  })}
-                </ul>
-              </div>
-
-              <div className="rounded-xl border border-border bg-surface p-5">
-                <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted">
-                  Executive wire
-                </h2>
-                {recentVectors.length === 0 ? (
-                  <p className="text-sm text-muted">Run a charter to stream typed vectors.</p>
-                ) : (
-                  <ul className="max-h-72 space-y-1.5 overflow-auto">
-                    {recentVectors.map((v, i) => (
-                      <li
-                        key={`${v.type}-${i}`}
-                        className="rounded-md border border-border bg-surface-2 px-2.5 py-1.5 font-mono text-[11px] text-muted"
-                      >
-                        <VectorLine v={v} />
-                      </li>
-                    ))}
-                  </ul>
-                )}
-                <h2 className="mb-2 mt-4 text-sm font-semibold uppercase tracking-wide text-muted">
-                  Event log
-                </h2>
-                <ul className="max-h-40 space-y-1 overflow-auto font-mono text-xs text-muted">
-                  {log.map((line, i) => (
-                    <li key={i} className="border-b border-border/50 py-1">
-                      <ArrowRight className="mr-1 inline h-3 w-3 text-primary" />
-                      {line}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </section>
-          </>
-        )}
-
-        {tab === "blueprint" && (
-          <section className="space-y-4">
-            <div className="rounded-xl border border-border bg-surface p-5">
-              <div className="mb-1 flex items-center gap-2">
-                <Wrench className="h-4 w-4 text-primary" />
-                <h1 className="text-lg font-semibold">Agent skills</h1>
-              </div>
-              <p className="mb-4 text-sm text-muted">
-                Function-calling tools exposed to the Boss / Position Managers.
-              </p>
-              <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                {SKILL_CATALOG.map((s) => (
-                  <li
-                    key={s.name}
-                    className="rounded-lg border border-border bg-surface-2 px-3 py-2.5"
-                  >
-                    <div className="font-mono text-xs text-primary">{s.name}</div>
-                    <div className="mt-1 text-xs text-muted">{s.purpose}</div>
-                  </li>
-                ))}
-              </ul>
+      <main className="mx-auto grid w-full max-w-6xl flex-1 gap-4 p-4 lg:grid-cols-3">
+        {/* LEFT: Team + CFO */}
+        <section className="space-y-4 lg:col-span-1">
+          <div className="rounded-xl border border-border bg-surface p-4 shadow-lg">
+            <div className="mb-1 flex items-center justify-between gap-2">
+              <h2 className="flex items-center gap-2 text-base font-semibold">
+                <Users className="h-4 w-4 text-primary" />
+                Your Team
+              </h2>
+              <span className="rounded bg-surface-2 px-2 py-0.5 font-mono text-[10px] text-primary">
+                {activePlayers} playing
+              </span>
             </div>
-            <div className="rounded-xl border border-border bg-surface p-5">
-              <h1 className="mb-1 text-lg font-semibold">Foundational structures</h1>
-              <p className="mb-4 text-sm text-muted">DNA of FlowChartCharter + Advanced Blueprint.</p>
-              <div className="grid gap-3 md:grid-cols-2">
-                {FOUNDATIONS.map((f) => (
-                  <article key={f.id} className="rounded-lg border border-border bg-surface-2 p-4">
-                    <h3 className="text-sm font-semibold text-primary">{f.name}</h3>
-                    <p className="mt-1 text-xs leading-relaxed text-muted">{f.description}</p>
-                    <p className="mt-2 text-[11px] text-muted">
-                      <span className="font-semibold text-fg/80">Mechanism · </span>
-                      {f.mechanism}
-                    </p>
-                  </article>
-                ))}
-              </div>
+            <p className="mb-3 text-xs text-muted">
+              Green stars = winners. Red = benched after Monday Sync.
+            </p>
+            <ul className="space-y-2">
+              {state.roster.map((a) => (
+                <PlayerCard key={a.id} agent={a} />
+              ))}
+            </ul>
+            <button
+              type="button"
+              disabled={busy}
+              onClick={onSync}
+              className="mt-4 flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-primary-fg shadow-md transition hover:opacity-90 disabled:opacity-50"
+            >
+              <RefreshCw className={`h-4 w-4 ${busy ? "animate-spin" : ""}`} />
+              Monday Morning Sync
+            </button>
+          </div>
+
+          <div className="rounded-xl border border-border bg-surface p-4 shadow-lg">
+            <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold uppercase tracking-wide">
+              <Wallet className="h-4 w-4 text-ok" />
+              Money Meter (CFO)
+            </h3>
+            <div className="mb-2 flex items-center justify-between text-sm">
+              <span className="text-muted">Max tokens per path</span>
+              <span className="font-mono font-bold text-ok">
+                {state.cfoBudget.toLocaleString()}
+              </span>
             </div>
-            <div className="grid gap-4 lg:grid-cols-2">
-              <div className="rounded-xl border border-border bg-surface p-5">
-                <h2 className="mb-3 text-sm font-semibold text-primary">Flow Unit Blueprint</h2>
-                <table className="w-full text-left text-xs">
-                  <thead className="text-muted">
-                    <tr className="border-b border-border">
-                      <th className="py-2 pr-2">Element</th>
-                      <th className="py-2 pr-2">Function</th>
-                      <th className="py-2">Contract</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {FLOW_UNIT_BLUEPRINT.map((row) => (
-                      <tr key={row.element} className="border-b border-border/60">
-                        <td className="py-2 pr-2 font-mono text-primary">{row.element}</td>
-                        <td className="py-2 pr-2 text-muted">{row.fn}</td>
-                        <td className="py-2 text-muted">{row.contract}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              <div className="rounded-xl border border-border bg-surface p-5">
-                <h2 className="mb-3 text-sm font-semibold text-primary">Hierarchy</h2>
-                <div className="mx-auto flex max-w-xs flex-col items-center gap-1.5">
-                  {HIERARCHY_PYRAMID.map((r, i) => (
-                    <div
-                      key={r.role}
-                      className="rounded-md border border-border bg-surface-2 py-2 text-center text-xs font-medium"
-                      style={{ width: `${100 - i * 10}%` }}
-                    >
-                      {r.role}
-                    </div>
-                  ))}
+            <input
+              type="range"
+              min={200}
+              max={5000}
+              step={100}
+              value={state.cfoBudget}
+              onChange={(e) =>
+                setState((s) => ({
+                  ...s,
+                  cfoBudget: Number(e.target.value),
+                }))
+              }
+              className="w-full"
+              aria-label="CFO token budget"
+            />
+            <p className="mt-2 text-[11px] text-muted">
+              Slide left = thrifty. If a path costs more than this, CFO says STOP.
+            </p>
+          </div>
+
+          <HowToPlay />
+        </section>
+
+        {/* RIGHT: Job + console */}
+        <section className="space-y-4 lg:col-span-2">
+          <div className="rounded-xl border border-border bg-surface p-4 shadow-lg sm:p-5">
+            <h2 className="mb-1 flex items-center gap-2 text-base font-semibold">
+              <Zap className="h-4 w-4 text-ok" />
+              Mission Control
+            </h2>
+            <p className="mb-4 text-xs text-muted">
+              1) Pick or type a job · 2) Tweak knobs · 3) Smash GO
+            </p>
+
+            <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-muted">
+              What should the team do?
+            </label>
+            <input
+              type="text"
+              value={state.workload}
+              onChange={(e) =>
+                setState((s) => ({ ...s, workload: e.target.value }))
+              }
+              className="mb-3 w-full rounded-xl border border-border bg-bg px-4 py-3 text-sm text-fg outline-none ring-primary focus:ring-2"
+              placeholder="Type a job…"
+            />
+
+            <div className="mb-3 flex flex-wrap gap-2">
+              {PRESET_JOBS.map((job) => (
+                <button
+                  key={job}
+                  type="button"
+                  onClick={() => setState((s) => ({ ...s, workload: job }))}
+                  className={`rounded-full border px-3 py-1.5 text-left text-[11px] transition ${
+                    state.workload === job
+                      ? "border-ok/50 bg-ok/15 text-ok"
+                      : "border-border bg-surface-2 text-muted hover:text-fg"
+                  }`}
+                >
+                  {job.length > 36 ? `${job.slice(0, 34)}…` : job}
+                </button>
+              ))}
+            </div>
+
+            <div className="mb-4 grid gap-3 sm:grid-cols-2">
+              <Knob
+                label="Messy-o-meter (entropy)"
+                hint="0 = clean · 1 = super messy"
+                value={state.entropy}
+                min={0}
+                max={1}
+                step={0.1}
+                onChange={(v) => setState((s) => ({ ...s, entropy: v }))}
+              />
+              <Knob
+                label="Memory match bar"
+                hint="Higher = harder to get a HIT"
+                value={state.threshold}
+                min={0.5}
+                max={1}
+                step={0.05}
+                onChange={(v) => setState((s) => ({ ...s, threshold: v }))}
+              />
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                disabled={busy || !state.workload.trim()}
+                onClick={onGo}
+                className="flex min-h-14 min-w-[10rem] flex-1 items-center justify-center gap-2 rounded-xl bg-ok px-6 py-3 text-base font-bold text-accent-fg shadow-lg transition hover:opacity-90 disabled:opacity-50 sm:flex-none"
+              >
+                <Play className="h-5 w-5 fill-current" />
+                GO!
+              </button>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={onReset}
+                className="flex min-h-14 items-center justify-center gap-2 rounded-xl border border-border bg-surface-2 px-4 py-3 text-sm text-muted hover:text-fg disabled:opacity-50"
+              >
+                <Eraser className="h-4 w-4" />
+                New game
+              </button>
+            </div>
+
+            {state.lastPath && (
+              <div
+                className={`mt-4 rounded-xl border px-4 py-3 ${
+                  state.lastHit
+                    ? "border-ok/40 bg-ok/10"
+                    : "border-primary/40 bg-primary/10"
+                }`}
+              >
+                <div className="mb-1 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide">
+                  <Sparkles className="h-3.5 w-3.5" />
+                  {state.lastHit ? "Memory HIT — reused path" : "Quantum path"}
                 </div>
-                <p className="mt-4 font-mono text-[11px] text-muted">{FITNESS_EQ}</p>
-                <p className="mt-2 font-mono text-[11px] text-muted">{QUANTUM.synergy}</p>
+                <div className="font-mono text-sm text-fg">
+                  {state.lastPath.join(" → ")}
+                </div>
               </div>
-            </div>
-          </section>
-        )}
+            )}
+          </div>
 
-        {tab === "mindmap" && (
-          <section className="space-y-4">
-            <div className="rounded-xl border border-border bg-surface p-5">
-              <h1 className="mb-1 text-lg font-semibold">FlowChartCharter Engineering</h1>
-              <p className="mb-5 text-sm text-muted">
-                Brain 1 communities — Advanced Blueprint math + skills.
-              </p>
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                {MIND_MAP.map((branch) => (
-                  <div key={branch.id} className="rounded-xl border border-border bg-surface-2 p-4">
-                    <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-primary">
-                      {branch.title}
-                    </div>
-                    <ul className="space-y-1.5">
-                      {branch.items.map((item) => (
-                        <li
-                          key={item}
-                          className="rounded-md border border-border/80 bg-bg/40 px-2.5 py-1.5 text-xs"
-                        >
-                          {item}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                ))}
-              </div>
+          {/* Console / blackboard */}
+          <div className="flex h-80 flex-col rounded-xl border border-border bg-surface p-4 shadow-lg">
+            <div className="mb-2 flex items-center justify-between">
+              <h3 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted">
+                <span className="h-2 w-2 rounded-full bg-primary" />
+                Game Log (Blackboard)
+              </h3>
+              <button
+                type="button"
+                onClick={() => setState((s) => clearLogs(s))}
+                className="text-xs text-muted hover:text-fg"
+              >
+                Clear
+              </button>
             </div>
-          </section>
-        )}
-
-        <footer className="border-t border-border pb-8 pt-4 text-center text-xs text-muted">
-          Cycle 5 · Advanced Blueprint · H_ctx · Q_s=exp(−kD) · CFO matrix · 5 skills
-        </footer>
+            <div className="flex-1 space-y-1.5 overflow-y-auto rounded-lg border border-border bg-bg p-3 font-mono text-xs">
+              {state.logs.map((line) => (
+                <div key={line.id} className={logColor(line.kind)}>
+                  <span className="text-muted">[{line.t}] </span>
+                  {line.text}
+                </div>
+              ))}
+              <div ref={logEnd} />
+            </div>
+          </div>
+        </section>
       </main>
+
+      <footer className="border-t border-border py-3 text-center text-[11px] text-muted">
+        FlowChartCharter Game Desk · Muscle-Memory · Quantum Router · CFO Guard
+      </footer>
     </div>
   );
 }
 
-function CollapseCard({ c }: { c: QuantumCollapse }) {
+function PlayerCard({ agent }: { agent: RosterAgent }) {
+  const score = fitnessScore(agent);
+  const badge =
+    agent.status === "PROMOTED"
+      ? "border-ok/40 bg-ok/10 text-ok"
+      : agent.status === "FIRED"
+        ? "border-danger/40 bg-danger/10 text-danger"
+        : "border-border bg-surface-2 text-muted";
+
   return (
-    <li className="rounded-lg border border-border bg-surface-2 p-3">
-      <div className="flex items-center justify-between gap-2">
-        <span className="text-sm font-medium">{c.agent}</span>
-        <span className="rounded bg-primary/15 px-2 py-0.5 font-mono text-[10px] text-primary">
-          {c.chosenPath}
-          {c.cfoForced ? " ·CFO" : ""}
-        </span>
+    <li className="flex items-center justify-between gap-2 rounded-xl border border-border bg-bg px-3 py-2.5">
+      <div className="min-w-0">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-sm font-bold">{agent.id}</span>
+          <span className="truncate text-xs text-muted">{agent.role}</span>
+          <span
+            className={`rounded border px-1.5 py-0.5 font-mono text-[10px] ${badge}`}
+          >
+            {agent.status}
+          </span>
+        </div>
+        <div className="mt-0.5 text-[11px] text-muted">
+          Wins {agent.success}/{agent.total} · Tokens {agent.tokens} · Oops{" "}
+          {agent.errors}
+        </div>
       </div>
-      <div className="mt-1 font-mono text-[10px] text-muted">
-        H={c.preEntropy} · H_ctx={c.contextEntropy}
-        {c.quality != null ? ` · Q=${c.quality}` : ""}
-      </div>
-      <div className="mt-2 space-y-1">
-        {c.amplitudes.map((a) => (
-          <div key={a.path}>
-            <div className="mb-0.5 flex justify-between font-mono text-[10px] text-muted">
-              <span>
-                {a.path} c={a.c}
-              </span>
-              <span>p={a.p}</span>
-            </div>
-            <div className="h-1 overflow-hidden rounded-full bg-bg">
-              <div
-                className={
-                  a.path === c.chosenPath ? "h-full bg-primary" : "h-full bg-muted/40"
-                }
-                style={{ width: `${Math.round(a.p * 100)}%` }}
-              />
-            </div>
-          </div>
-        ))}
+      <div className="shrink-0 text-right font-mono text-xs text-primary">
+        {score.toFixed(2)}
       </div>
     </li>
   );
 }
 
-function VectorLine({ v }: { v: ExecVector }) {
-  if (v.type === "RhythmAudit") {
-    return (
-      <span>
-        <span className="text-primary">{v.type}</span> Q={v.quality} passed={String(v.passed)}
-      </span>
-    );
-  }
-  if (v.type === "GovernanceVector") {
-    return (
-      <span>
-        <span className="text-primary">{v.type}</span> hand_off={String(v.approve_hand_off)}
-      </span>
-    );
-  }
-  if (v.type === "BudgetVector") {
-    return (
-      <span>
-        <span className="text-primary">{v.type}</span> spend={v.token_spend}/{v.token_budget}
-      </span>
-    );
-  }
+function Knob({
+  label,
+  hint,
+  value,
+  min,
+  max,
+  step,
+  onChange,
+}: {
+  label: string;
+  hint: string;
+  value: number;
+  min: number;
+  max: number;
+  step: number;
+  onChange: (v: number) => void;
+}) {
   return (
-    <span>
-      <span className="text-primary">{v.type}</span> from={v.from}
-    </span>
+    <div className="rounded-xl border border-border bg-bg p-3">
+      <div className="mb-1 flex items-center justify-between gap-2">
+        <span className="text-xs font-medium text-muted">{label}</span>
+        <span className="font-mono text-sm font-bold text-primary">
+          {value.toFixed(2)}
+        </span>
+      </div>
+      <input
+        type="range"
+        min={min}
+        max={max}
+        step={step}
+        value={value}
+        onChange={(e) => onChange(Number(e.target.value))}
+        className="w-full"
+        aria-label={label}
+      />
+      <p className="mt-1 text-[10px] text-muted">{hint}</p>
+    </div>
   );
 }
 
-function MetricCard({
-  icon,
-  label,
-  value,
-  hint,
-}: {
-  icon: ReactNode;
-  label: string;
-  value: string;
-  hint: string;
-}) {
+function HowToPlay() {
   return (
-    <div className="rounded-xl border border-border bg-surface p-4">
-      <div className="mb-2 flex items-center gap-2 text-primary">
-        {icon}
-        <span className="text-xs font-medium uppercase tracking-wide text-muted">{label}</span>
+    <div className="rounded-xl border border-border bg-surface p-4 text-xs text-muted">
+      <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-fg">
+        <ArrowRight className="h-4 w-4 text-ok" />
+        How to play
       </div>
-      <div className="text-2xl font-semibold tracking-tight">{value}</div>
-      <div className="mt-1 text-[10px] text-muted">{hint}</div>
+      <ol className="list-decimal space-y-1.5 pl-4">
+        <li>
+          Pick a job chip (or type your own).
+        </li>
+        <li>
+          Press the big green <strong className="text-ok">GO!</strong>
+        </li>
+        <li>
+          Watch the log: <strong className="text-ok">HIT</strong> = free cheat
+          sheet · MISS = robots invent a path.
+        </li>
+        <li>
+          Press <strong className="text-primary">Monday Morning Sync</strong> to
+          promote stars and bench flops.
+        </li>
+      </ol>
     </div>
   );
+}
+
+function logColor(kind: LogKind): string {
+  if (kind === "success") return "text-ok";
+  if (kind === "warning") return "text-warn";
+  if (kind === "error") return "text-danger";
+  return "text-fg/90";
+}
+
+function sleep(ms: number) {
+  return new Promise((r) => setTimeout(r, ms));
 }
