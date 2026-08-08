@@ -13,8 +13,10 @@ import {
   Shield,
   Users,
   Zap,
+  Wrench,
 } from "lucide-react";
 import {
+  AGENT_SKILLS,
   PHASES,
   WORKLOADS,
   fitness,
@@ -32,6 +34,7 @@ import {
   HIERARCHY_PYRAMID,
   MIND_MAP,
   QUANTUM,
+  SKILL_CATALOG,
 } from "@/lib/flowchartcharter/knowledge";
 
 export const Route = createFileRoute("/")({
@@ -45,7 +48,7 @@ function StudioPage() {
   const [activePhase, setActivePhase] = useState(0);
   const [tab, setTab] = useState<Tab>("live");
   const [log, setLog] = useState<string[]>([
-    "Quantum routing online — |ψ⟩ → M|ψ⟩ collapse at super-step · muscle-memory reinforce.",
+    "Tensor routing online — H_ctx · CFO matrix · five agent skills · Q_s = exp(−kD).",
   ]);
   const [busy, setBusy] = useState(false);
 
@@ -80,7 +83,7 @@ function StudioPage() {
         history: [...a.history],
         muscleMemory: { ...a.muscleMemory },
       }));
-      const { run, vectors, tokenSpend } = runCharter(
+      const { run, vectors, tokenSpend, skillsUsed } = runCharter(
         roster,
         workload,
         prev.vectors,
@@ -90,11 +93,11 @@ function StudioPage() {
       const runs = [...prev.runs, run];
       const trustRate = runs.filter((r) => r.trust).length / runs.length;
       pushLog(
-        `CHARTER "${workload}" · Q=${run.quality.toFixed(3)} · collapses=${run.collapses.length} · Q_ent=${run.entanglement} · trust=${run.trust}`,
+        `CHARTER "${workload}" · Q=${run.quality.toFixed(3)} · H_ctx=${run.contextEntropy.toFixed(3)} · Q_s=${run.qsMean.toFixed(3)} · trust=${run.trust}`,
       );
       for (const c of run.collapses.filter((x) => x.marker === "superstep")) {
         pushLog(
-          `  M|ψ⟩ ${c.agent} → ${c.chosenPath} (H=${c.preEntropy} → 0 · conf=1.0)`,
+          `  M|ψ⟩ ${c.agent} → ${c.chosenPath}${c.cfoForced ? " [CFO]" : ""} (H=${c.preEntropy} · H_ctx=${c.contextEntropy})`,
         );
       }
       return {
@@ -106,6 +109,7 @@ function StudioPage() {
         trustRate,
         step: prev.step + 1,
         lastCollapses: run.collapses,
+        skillsUsed,
       };
     });
     setBusy(false);
@@ -132,7 +136,7 @@ function StudioPage() {
         last?.quality ?? 0,
       );
       pushLog(
-        `MONDAY SYNC · ${Object.entries(outcomes)
+        `MONDAY SYNC · TriggerMondayMorningSync · ${Object.entries(outcomes)
           .map(([k, v]) => `${k}:${v}`)
           .join(" · ") || "stable"}`,
       );
@@ -143,6 +147,7 @@ function StudioPage() {
         playbook: [...playbook, ...prev.playbook].slice(0, 24),
         vectors,
         step: prev.step + 1,
+        skillsUsed: [...AGENT_SKILLS],
       };
     });
     setBusy(false);
@@ -168,7 +173,7 @@ function StudioPage() {
             <div>
               <div className="text-sm font-semibold tracking-tight">FlowChartCharter Studio</div>
               <div className="text-xs text-muted">
-                Quantum routing · |ψ⟩ → M|ψ⟩ · Cycle 4
+                Advanced Blueprint · Tensor routing · Cycle 5
               </div>
             </div>
           </div>
@@ -206,8 +211,8 @@ function StudioPage() {
                   <h1 className="text-lg font-semibold">Charter map</h1>
                 </div>
                 <p className="mb-4 text-sm leading-relaxed text-muted">
-                  At ST-03 each agent builds |ψ⟩ from muscle-memory, then the Charter measures
-                  M|ψ⟩ → one definitive path (confidence 1.0). Outcomes reinforce amplitudes.
+                  Tensor-Based Routing: muscle-memory × contextual entropy × CFO budget matrix,
+                  then M collapses |ψ⟩ to one path (confidence 1.0). Five agent skills drive the loop.
                 </p>
                 <ol className="grid gap-2 sm:grid-cols-2">
                   {PHASES.map((p, i) => {
@@ -271,29 +276,45 @@ function StudioPage() {
                 />
                 <MetricCard
                   icon={<Activity className="h-4 w-4" />}
-                  label="Entanglement Q"
-                  value={lastRun ? lastRun.entanglement.toFixed(3) : "—"}
-                  hint="Team synergy across sequential units"
+                  label="H_ctx · Q_s"
+                  value={
+                    lastRun
+                      ? `${lastRun.contextEntropy.toFixed(2)} · ${lastRun.qsMean.toFixed(2)}`
+                      : "—"
+                  }
+                  hint="Context entropy · schema synergy"
                 />
                 <MetricCard
                   icon={<Briefcase className="h-4 w-4" />}
-                  label="Pre-measure entropy"
-                  value={lastRun ? lastRun.meanPreEntropy.toFixed(3) : "—"}
-                  hint="H(|ψ⟩) before collapse → 0 after M"
+                  label="Avg fitness F"
+                  value={avgFitness ? avgFitness.toFixed(3) : "—"}
+                  hint="Talent management signal"
                 />
               </div>
             </section>
 
             <section className="rounded-xl border border-border bg-surface p-5">
-              <h2 className="mb-1 text-sm font-semibold uppercase tracking-wide text-muted">
-                Quantum path collapse
-              </h2>
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">
+                  Quantum path collapse
+                </h2>
+                <div className="flex flex-wrap gap-1">
+                  {(snap.skillsUsed.length ? snap.skillsUsed : AGENT_SKILLS).map((s) => (
+                    <span
+                      key={s}
+                      className="rounded-full border border-border bg-surface-2 px-2 py-0.5 font-mono text-[10px] text-muted"
+                    >
+                      {s}
+                    </span>
+                  ))}
+                </div>
+              </div>
               <p className="mb-3 font-mono text-[11px] text-muted">
-                {QUANTUM.superposition} · {QUANTUM.measurement}
+                {QUANTUM.superposition} · {QUANTUM.measurement} · {QUANTUM.synergy}
               </p>
               {collapses.length === 0 ? (
                 <p className="text-sm text-muted">
-                  Run a charter to watch |ψ⟩ amplitudes collapse into definitive paths.
+                  Run a charter — messy workloads raise H_ctx and bias toward path_B (cleansing).
                 </p>
               ) : (
                 <ul className="grid gap-3 sm:grid-cols-3">
@@ -307,14 +328,15 @@ function StudioPage() {
             <section className="grid gap-4 lg:grid-cols-2">
               <div className="rounded-xl border border-border bg-surface p-5">
                 <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted">
-                  Roster · muscle memory
+                  Roster · muscle memory (A / B / lite)
                 </h2>
                 <ul className="space-y-2">
                   {snap.roster.map((a) => {
                     const f = fitness(a.history);
-                    const total =
-                      (a.muscleMemory.path_A ?? 1) + (a.muscleMemory.path_B ?? 1);
-                    const pA = ((a.muscleMemory.path_A ?? 1) / total) * 100;
+                    const wA = a.muscleMemory.path_A ?? 1;
+                    const wB = a.muscleMemory.path_B ?? 1;
+                    const wL = a.muscleMemory.path_lite ?? 1;
+                    const total = wA + wB + wL;
                     return (
                       <li
                         key={a.id}
@@ -333,17 +355,22 @@ function StudioPage() {
                         {a.layer === "ops" && (
                           <div className="mt-2">
                             <div className="mb-0.5 flex justify-between font-mono text-[10px] text-muted">
-                              <span>path_A {(a.muscleMemory.path_A ?? 1).toFixed(2)}</span>
-                              <span>path_B {(a.muscleMemory.path_B ?? 1).toFixed(2)}</span>
+                              <span>A {wA.toFixed(2)}</span>
+                              <span>B {wB.toFixed(2)}</span>
+                              <span>lite {wL.toFixed(2)}</span>
                             </div>
                             <div className="flex h-1.5 overflow-hidden rounded-full bg-bg">
                               <div
                                 className="bg-primary transition-all"
-                                style={{ width: `${pA}%` }}
+                                style={{ width: `${(wA / total) * 100}%` }}
                               />
                               <div
                                 className="bg-accent/80 transition-all"
-                                style={{ width: `${100 - pA}%` }}
+                                style={{ width: `${(wB / total) * 100}%` }}
+                              />
+                              <div
+                                className="bg-muted/60 transition-all"
+                                style={{ width: `${(wL / total) * 100}%` }}
                               />
                             </div>
                           </div>
@@ -391,8 +418,28 @@ function StudioPage() {
         {tab === "blueprint" && (
           <section className="space-y-4">
             <div className="rounded-xl border border-border bg-surface p-5">
+              <div className="mb-1 flex items-center gap-2">
+                <Wrench className="h-4 w-4 text-primary" />
+                <h1 className="text-lg font-semibold">Agent skills</h1>
+              </div>
+              <p className="mb-4 text-sm text-muted">
+                Function-calling tools exposed to the Boss / Position Managers.
+              </p>
+              <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                {SKILL_CATALOG.map((s) => (
+                  <li
+                    key={s.name}
+                    className="rounded-lg border border-border bg-surface-2 px-3 py-2.5"
+                  >
+                    <div className="font-mono text-xs text-primary">{s.name}</div>
+                    <div className="mt-1 text-xs text-muted">{s.purpose}</div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div className="rounded-xl border border-border bg-surface p-5">
               <h1 className="mb-1 text-lg font-semibold">Foundational structures</h1>
-              <p className="mb-4 text-sm text-muted">DNA of FlowChartCharter + quantum measurement model.</p>
+              <p className="mb-4 text-sm text-muted">DNA of FlowChartCharter + Advanced Blueprint.</p>
               <div className="grid gap-3 md:grid-cols-2">
                 {FOUNDATIONS.map((f) => (
                   <article key={f.id} className="rounded-lg border border-border bg-surface-2 p-4">
@@ -442,6 +489,7 @@ function StudioPage() {
                   ))}
                 </div>
                 <p className="mt-4 font-mono text-[11px] text-muted">{FITNESS_EQ}</p>
+                <p className="mt-2 font-mono text-[11px] text-muted">{QUANTUM.synergy}</p>
               </div>
             </div>
           </section>
@@ -451,7 +499,9 @@ function StudioPage() {
           <section className="space-y-4">
             <div className="rounded-xl border border-border bg-surface p-5">
               <h1 className="mb-1 text-lg font-semibold">FlowChartCharter Engineering</h1>
-              <p className="mb-5 text-sm text-muted">Brain 1 communities — structural precision over parameter scale.</p>
+              <p className="mb-5 text-sm text-muted">
+                Brain 1 communities — Advanced Blueprint math + skills.
+              </p>
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 {MIND_MAP.map((branch) => (
                   <div key={branch.id} className="rounded-xl border border-border bg-surface-2 p-4">
@@ -476,7 +526,7 @@ function StudioPage() {
         )}
 
         <footer className="border-t border-border pb-8 pt-4 text-center text-xs text-muted">
-          Cycle 4 · QuantumRouter · |ψ⟩ = Σ cᵢ|FlowUnitᵢ⟩ · M = Charter @ RhythmMarker
+          Cycle 5 · Advanced Blueprint · H_ctx · Q_s=exp(−kD) · CFO matrix · 5 skills
         </footer>
       </main>
     </div>
@@ -490,10 +540,11 @@ function CollapseCard({ c }: { c: QuantumCollapse }) {
         <span className="text-sm font-medium">{c.agent}</span>
         <span className="rounded bg-primary/15 px-2 py-0.5 font-mono text-[10px] text-primary">
           {c.chosenPath}
+          {c.cfoForced ? " ·CFO" : ""}
         </span>
       </div>
       <div className="mt-1 font-mono text-[10px] text-muted">
-        H={c.preEntropy} → 0 · conf={c.confidence}
+        H={c.preEntropy} · H_ctx={c.contextEntropy}
         {c.quality != null ? ` · Q=${c.quality}` : ""}
       </div>
       <div className="mt-2 space-y-1">
