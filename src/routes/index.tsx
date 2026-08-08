@@ -3,6 +3,7 @@ import { useMemo, useState, type ReactNode } from "react";
 import {
   Activity,
   ArrowRight,
+  Briefcase,
   CheckCircle2,
   GitBranch,
   Play,
@@ -18,6 +19,7 @@ import {
   initialSnapshot,
   mondayMorningSync,
   runCharter,
+  type ExecVector,
   type SystemSnapshot,
 } from "@/lib/flowchartcharter/engine";
 
@@ -29,26 +31,26 @@ function StudioPage() {
   const [snap, setSnap] = useState<SystemSnapshot>(() => initialSnapshot());
   const [activePhase, setActivePhase] = useState(0);
   const [log, setLog] = useState<string[]>([
-    "Studio ready — Charter primary, GraphRAG secondary (callable tool only).",
+    "Cycle 2 ready — CEO/CFO/Board typed vectors · RhythmAudit at ST-04.",
   ]);
   const [busy, setBusy] = useState(false);
 
   const lastRun = snap.runs[snap.runs.length - 1];
 
   const avgFitness = useMemo(() => {
-    const vals = snap.roster.map((a) => fitness(a.history));
-    if (!vals.length) return 0;
-    return vals.reduce((s, v) => s + v, 0) / vals.length;
+    const ops = snap.roster.filter((a) => a.talentEligible && a.history.length);
+    if (!ops.length) return 0;
+    return ops.reduce((s, a) => s + fitness(a.history), 0) / ops.length;
   }, [snap.roster]);
 
   function pushLog(line: string) {
-    setLog((prev) => [line, ...prev].slice(0, 40));
+    setLog((prev) => [line, ...prev].slice(0, 48));
   }
 
   async function animatePhases(until: number) {
     for (let i = 0; i <= until; i++) {
       setActivePhase(i);
-      await new Promise((r) => setTimeout(r, 180));
+      await new Promise((r) => setTimeout(r, 160));
     }
   }
 
@@ -58,17 +60,29 @@ function StudioPage() {
     const workload = WORKLOADS[snap.runs.length % WORKLOADS.length];
     await animatePhases(5);
     setSnap((prev) => {
-      const roster = prev.roster.map((a) => ({ ...a, history: [...a.history], muscleMemory: { ...a.muscleMemory } }));
-      const run = runCharter(roster, workload);
+      const roster = prev.roster.map((a) => ({
+        ...a,
+        history: [...a.history],
+        muscleMemory: { ...a.muscleMemory },
+      }));
+      const { run, vectors, tokenSpend } = runCharter(
+        roster,
+        workload,
+        prev.vectors,
+        prev.tokenSpend,
+        prev.tokenBudget,
+      );
       const runs = [...prev.runs, run];
       const trustRate = runs.filter((r) => r.trust).length / runs.length;
       pushLog(
-        `CHARTER "${workload}" · Q=${run.quality.toFixed(3)} · trust=${run.trust} · loops=${run.remediationLoops}`,
+        `CHARTER "${workload}" · Q=${run.quality.toFixed(3)} · audit=${run.auditPassed} · trust=${run.trust} · loops=${run.remediationLoops}`,
       );
       return {
         ...prev,
         roster,
         runs,
+        vectors,
+        tokenSpend,
         trustRate,
         step: prev.step + 1,
       };
@@ -86,13 +100,26 @@ function StudioPage() {
         history: [...a.history],
         muscleMemory: { ...a.muscleMemory },
       }));
-      const { outcomes, playbook } = mondayMorningSync(roster);
-      pushLog(`MONDAY SYNC · ${Object.entries(outcomes).map(([k, v]) => `${k}:${v}`).join(" · ")}`);
+      const last = prev.runs[prev.runs.length - 1];
+      const { outcomes, playbook, vectors } = mondayMorningSync(
+        roster,
+        prev.vectors,
+        prev.tokenSpend,
+        prev.tokenBudget,
+        last?.trust ?? false,
+        last?.quality ?? 0,
+      );
+      pushLog(
+        `MONDAY SYNC · ${Object.entries(outcomes)
+          .map(([k, v]) => `${k}:${v}`)
+          .join(" · ") || "no operational changes"}`,
+      );
       return {
         ...prev,
         roster,
         syncOutcomes: outcomes,
         playbook: [...playbook, ...prev.playbook].slice(0, 24),
+        vectors,
         step: prev.step + 1,
       };
     });
@@ -102,8 +129,10 @@ function StudioPage() {
   function onReset() {
     setSnap(initialSnapshot());
     setActivePhase(0);
-    setLog(["System reset — fresh roster, empty checkpointer."]);
+    setLog(["System reset — fresh roster, empty executive wire."]);
   }
+
+  const recentVectors = [...snap.vectors].reverse().slice(0, 10);
 
   return (
     <div className="min-h-screen bg-bg text-fg">
@@ -115,7 +144,7 @@ function StudioPage() {
             </div>
             <div>
               <div className="text-sm font-semibold tracking-tight">FlowChartCharter Studio</div>
-              <div className="text-xs text-muted">Execution-first · Coach Trust Hand-Off</div>
+              <div className="text-xs text-muted">Cycle 2 · Executive vectors · RhythmAudit</div>
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -147,8 +176,8 @@ function StudioPage() {
               <h1 className="text-lg font-semibold">Charter map</h1>
             </div>
             <p className="mb-4 text-sm text-muted leading-relaxed">
-              Glanceable sequential ownership replaces open graph traversal under pressure.
-              GraphRAG remains a callable sub-flow — never the default orchestration layer.
+              Pre-drawn flow units with RhythmAudit gates. Executives speak only in typed JSON
+              vectors — no free-form chat, minimal token waste.
             </p>
             <ol className="grid gap-2 sm:grid-cols-2">
               {PHASES.map((p, i) => {
@@ -177,7 +206,7 @@ function StudioPage() {
                 type="button"
                 disabled={busy}
                 onClick={onRunCharter}
-                className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-fg hover:opacity-90 disabled:opacity-50"
+                className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-fg hover:opacity-90 disabled:opacity-50"
               >
                 <Play className="h-4 w-4" />
                 Run charter
@@ -186,7 +215,7 @@ function StudioPage() {
                 type="button"
                 disabled={busy || snap.runs.length === 0}
                 onClick={onSync}
-                className="inline-flex items-center gap-2 rounded-lg border border-border bg-surface-2 px-4 py-2.5 text-sm font-medium hover:border-primary/40 disabled:opacity-50"
+                className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-border bg-surface-2 px-4 py-2.5 text-sm font-medium hover:border-primary/40 disabled:opacity-50"
               >
                 <Users className="h-4 w-4" />
                 Monday morning sync
@@ -195,7 +224,7 @@ function StudioPage() {
                 type="button"
                 disabled={busy}
                 onClick={onReset}
-                className="inline-flex items-center gap-2 rounded-lg border border-border px-4 py-2.5 text-sm text-muted hover:text-fg disabled:opacity-50"
+                className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-border px-4 py-2.5 text-sm text-muted hover:text-fg disabled:opacity-50"
               >
                 <RefreshCw className="h-4 w-4" />
                 Reset
@@ -208,20 +237,40 @@ function StudioPage() {
               icon={<Shield className="h-4 w-4" />}
               label="Coach trust rate"
               value={`${Math.round(snap.trustRate * 100)}%`}
-              hint={lastRun?.trust ? "Hand-off earned on last run" : "Run charters to earn trust"}
+              hint={lastRun?.trust ? "Board approved hand-off" : "Run charters to earn trust"}
             />
             <MetricCard
               icon={<Activity className="h-4 w-4" />}
-              label="Avg agent fitness"
+              label="Avg ops fitness"
               value={avgFitness.toFixed(3)}
-              hint="F = 0.4Q + 0.3Rhythm − 0.0002Cost + 0.2Synergy"
+              hint="F = 0.4Q + 0.3Rhythm − 0.15·(Cost/300) + 0.2Synergy"
             />
             <MetricCard
-              icon={<GitBranch className="h-4 w-4" />}
-              label="Charters completed"
-              value={String(snap.runs.length)}
-              hint={`Super-step counter ${snap.step}`}
+              icon={<Briefcase className="h-4 w-4" />}
+              label="Token spend"
+              value={`${snap.tokenSpend.toLocaleString()} / ${snap.tokenBudget.toLocaleString()}`}
+              hint="CFO BudgetVector tracks spend vs cap"
             />
+          </div>
+        </section>
+
+        <section className="rounded-xl border border-border bg-surface p-5">
+          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted">
+            Executive layer (typed vectors only)
+          </h2>
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+            {[
+              { title: "CEO", name: snap.executives.ceo, vector: "StrategyVector" },
+              { title: "CFO", name: snap.executives.cfo, vector: "BudgetVector" },
+              { title: "Board", name: snap.executives.board, vector: "GovernanceVector" },
+              { title: "GM", name: snap.executives.gm, vector: "OpsVector" },
+            ].map((e) => (
+              <div key={e.title} className="rounded-lg border border-border bg-surface-2 px-3 py-3">
+                <div className="text-xs font-semibold text-primary">{e.title}</div>
+                <div className="text-sm font-medium">{e.name}</div>
+                <div className="mt-1 font-mono text-[11px] text-muted">{e.vector}</div>
+              </div>
+            ))}
           </div>
         </section>
 
@@ -244,11 +293,15 @@ function StudioPage() {
                   >
                     <div>
                       <div className="text-sm font-medium">{a.name}</div>
-                      <div className="text-xs text-muted">{a.role}</div>
+                      <div className="text-xs text-muted">
+                        {a.role} · {a.layer}
+                      </div>
                     </div>
                     <div className="text-right">
                       <div className={`text-xs font-semibold ${statusColor}`}>{a.status}</div>
-                      <div className="font-mono text-xs text-muted">F={f.toFixed(3)} · rank {a.corporateRank}</div>
+                      <div className="font-mono text-xs text-muted">
+                        {a.talentEligible ? `F=${f.toFixed(3)}` : "exec/audit"} · rank {a.corporateRank}
+                      </div>
                     </div>
                   </li>
                 );
@@ -256,6 +309,30 @@ function StudioPage() {
             </ul>
           </div>
 
+          <div className="rounded-xl border border-border bg-surface p-5">
+            <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted">
+              Executive wire (JSON vectors)
+            </h2>
+            {recentVectors.length === 0 ? (
+              <p className="text-sm text-muted">
+                No vectors yet. Run a charter — CEO StrategyVector posts at ST-01; RhythmAudit at ST-04.
+              </p>
+            ) : (
+              <ul className="max-h-72 space-y-2 overflow-auto">
+                {recentVectors.map((v, i) => (
+                  <li
+                    key={`${v.type}-${i}`}
+                    className="rounded-lg border border-border bg-surface-2 px-3 py-2 font-mono text-[11px] text-muted"
+                  >
+                    <VectorLine v={v} />
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </section>
+
+        <section className="grid gap-4 lg:grid-cols-2">
           <div className="rounded-xl border border-border bg-surface p-5">
             <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted">
               Run telemetry
@@ -273,26 +350,22 @@ function StudioPage() {
                       <span className="text-sm font-medium">{r.workload}</span>
                       {r.trust ? (
                         <span className="inline-flex items-center gap-1 text-xs font-semibold text-ok">
-                          <CheckCircle2 className="h-3.5 w-3.5" /> Trust
+                          <CheckCircle2 className="h-3.5 w-3.5" /> Board trust
                         </span>
                       ) : (
                         <span className="text-xs font-semibold text-accent">Remediate</span>
                       )}
                     </div>
                     <div className="mt-1 font-mono text-xs text-muted">
-                      Q={r.quality.toFixed(3)} · loops={r.remediationLoops} · paths{" "}
-                      {Object.entries(r.pathByAgent)
-                        .map(([k, v]) => `${k}:${v}`)
-                        .join(", ")}
+                      Q={r.quality.toFixed(3)} · audit={String(r.auditPassed)} · loops=
+                      {r.remediationLoops}
                     </div>
                   </li>
                 ))}
               </ul>
             )}
           </div>
-        </section>
 
-        <section className="grid gap-4 lg:grid-cols-2">
           <div className="rounded-xl border border-border bg-surface p-5">
             <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted">Event log</h2>
             <ul className="max-h-56 space-y-1 overflow-auto font-mono text-xs text-muted">
@@ -304,29 +377,53 @@ function StudioPage() {
               ))}
             </ul>
           </div>
-          <div className="rounded-xl border border-border bg-surface p-5">
-            <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted">Playbook</h2>
-            {snap.playbook.length === 0 ? (
-              <p className="text-sm text-muted">
-                Downtime sync writes promotion/retention notes here after Monday Morning Sync.
-              </p>
-            ) : (
-              <ul className="max-h-56 space-y-1 overflow-auto text-sm">
-                {snap.playbook.map((p, i) => (
-                  <li key={i} className="rounded-md bg-surface-2 px-2 py-1.5 text-muted">
-                    {p}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
         </section>
 
         <footer className="border-t border-border pt-4 pb-8 text-center text-xs text-muted">
-          Open design · Apache-2.0 · Spectre Industries · flowchartcharter-engineering skill
+          Cycle 2 · Apache-2.0 · advanced-agent-builder + advanced-coding · executive-comms-protocol
         </footer>
       </main>
     </div>
+  );
+}
+
+function VectorLine({ v }: { v: ExecVector }) {
+  if (v.type === "RhythmAudit") {
+    return (
+      <span>
+        <span className="text-primary">{v.type}</span> marker={v.marker} Q={v.quality} passed=
+        {String(v.passed)}
+      </span>
+    );
+  }
+  if (v.type === "GovernanceVector") {
+    return (
+      <span>
+        <span className="text-primary">{v.type}</span> from={v.from} hand_off=
+        {String(v.approve_hand_off)} · {v.notes}
+      </span>
+    );
+  }
+  if (v.type === "BudgetVector") {
+    return (
+      <span>
+        <span className="text-primary">{v.type}</span> spend={v.token_spend} / {v.token_budget} halt=
+        {String(v.halt_if_over)}
+      </span>
+    );
+  }
+  if (v.type === "OpsVector") {
+    const keys = Object.keys(v.roster_outcomes ?? {});
+    return (
+      <span>
+        <span className="text-primary">{v.type}</span> from={v.from} roster={keys.join(",") || "—"}
+      </span>
+    );
+  }
+  return (
+    <span>
+      <span className="text-primary">{v.type}</span> from={v.from} charter={v.charter_id}
+    </span>
   );
 }
 
