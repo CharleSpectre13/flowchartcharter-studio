@@ -55,11 +55,10 @@ function MasterDashboard() {
     setState(createDashboard());
   }
 
-  const activePlayers = state.roster.filter((a) => a.status !== "FIRED").length;
+  const activeAgents = state.roster.filter((a) => a.status !== "FIRED").length;
 
   return (
     <div className="flex min-h-full flex-col bg-bg text-fg">
-      {/* Top bar */}
       <header className="sticky top-0 z-20 border-b border-border bg-surface/95 backdrop-blur">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-3">
           <div className="flex items-center gap-3">
@@ -68,46 +67,49 @@ function MasterDashboard() {
               <h1 className="text-base font-bold tracking-tight sm:text-lg">
                 FlowChartCharter
                 <span className="ml-2 rounded border border-primary/40 bg-primary/10 px-2 py-0.5 font-mono text-[10px] font-medium uppercase tracking-widest text-primary">
-                  Game Desk v1
+                  Enterprise Engine v1
                 </span>
               </h1>
               <p className="text-xs text-muted">
-                Press GO — the robots follow the map
+                Run a charter — agents follow the map
               </p>
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-3 text-xs text-muted">
             <span>
-              Coach: <strong className="text-fg">You</strong>
+              Head Coach: <strong className="text-fg">Active</strong>
             </span>
             <span>
               Rhythm:{" "}
               <strong className="text-ok">
-                {state.rhythm === "idle" ? "Ready" : state.rhythm === "running" ? "Running…" : "Sync…"}
+                {state.rhythm === "idle"
+                  ? "In Total Sync"
+                  : state.rhythm === "running"
+                    ? "Executing…"
+                    : "Syncing…"}
               </strong>
             </span>
             <span className="font-mono text-primary">
-              Runs {state.runs} · Hits {state.hits}
+              Runs {state.runs} · Memory hits {state.hits}
             </span>
           </div>
         </div>
       </header>
 
       <main className="mx-auto grid w-full max-w-6xl flex-1 gap-4 p-4 lg:grid-cols-3">
-        {/* LEFT: Team + CFO */}
         <section className="space-y-4 lg:col-span-1">
           <div className="rounded-xl border border-border bg-surface p-4 shadow-lg">
             <div className="mb-1 flex items-center justify-between gap-2">
               <h2 className="flex items-center gap-2 text-base font-semibold">
                 <Users className="h-4 w-4 text-primary" />
-                Your Team
+                Corporate Roster
               </h2>
               <span className="rounded bg-surface-2 px-2 py-0.5 font-mono text-[10px] text-primary">
-                {activePlayers} playing
+                {activeAgents} active
               </span>
             </div>
             <p className="mb-3 text-xs text-muted">
-              Green stars = winners. Red = benched after Monday Sync.
+              Promoted = high fitness. Fired = below benchmark after Monday Sync.
             </p>
             <ul className="space-y-2">
               {state.roster.map((a) => (
@@ -128,12 +130,12 @@ function MasterDashboard() {
           <div className="rounded-xl border border-border bg-surface p-4 shadow-lg">
             <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold uppercase tracking-wide">
               <Wallet className="h-4 w-4 text-ok" />
-              Money Meter (CFO)
+              CFO Token Guardrail
             </h3>
             <div className="mb-2 flex items-center justify-between text-sm">
-              <span className="text-muted">Max tokens per path</span>
+              <span className="text-muted">Cost ceiling</span>
               <span className="font-mono font-bold text-ok">
-                {state.cfoBudget.toLocaleString()}
+                {state.cfoBudget.toLocaleString()} tokens
               </span>
             </div>
             <input
@@ -152,26 +154,25 @@ function MasterDashboard() {
               aria-label="CFO token budget"
             />
             <p className="mt-2 text-[11px] text-muted">
-              Slide left = thrifty. If a path costs more than this, CFO says STOP.
+              Paths over this budget are blocked before collapse.
             </p>
           </div>
 
-          <HowToPlay />
+          <HowToUse />
         </section>
 
-        {/* RIGHT: Job + console */}
         <section className="space-y-4 lg:col-span-2">
           <div className="rounded-xl border border-border bg-surface p-4 shadow-lg sm:p-5">
             <h2 className="mb-1 flex items-center gap-2 text-base font-semibold">
               <Zap className="h-4 w-4 text-ok" />
-              Mission Control
+              Workload Charter
             </h2>
             <p className="mb-4 text-xs text-muted">
-              1) Pick or type a job · 2) Tweak knobs · 3) Smash GO
+              Describe the job, set entropy and match threshold, then run.
             </p>
 
             <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-muted">
-              What should the team do?
+              Job description
             </label>
             <input
               type="text"
@@ -180,7 +181,7 @@ function MasterDashboard() {
                 setState((s) => ({ ...s, workload: e.target.value }))
               }
               className="mb-3 w-full rounded-xl border border-border bg-bg px-4 py-3 text-sm text-fg outline-none ring-primary focus:ring-2"
-              placeholder="Type a job…"
+              placeholder="Describe the workload…"
             />
 
             <div className="mb-3 flex flex-wrap gap-2">
@@ -202,8 +203,8 @@ function MasterDashboard() {
 
             <div className="mb-4 grid gap-3 sm:grid-cols-2">
               <Knob
-                label="Messy-o-meter (entropy)"
-                hint="0 = clean · 1 = super messy"
+                label="Context entropy"
+                hint="0 = clean data · 1 = messy / high uncertainty"
                 value={state.entropy}
                 min={0}
                 max={1}
@@ -211,8 +212,8 @@ function MasterDashboard() {
                 onChange={(v) => setState((s) => ({ ...s, entropy: v }))}
               />
               <Knob
-                label="Memory match bar"
-                hint="Higher = harder to get a HIT"
+                label="Memory match threshold"
+                hint="Higher requires a closer Muscle-Memory match"
                 value={state.threshold}
                 min={0.5}
                 max={1}
@@ -229,7 +230,7 @@ function MasterDashboard() {
                 className="flex min-h-14 min-w-[10rem] flex-1 items-center justify-center gap-2 rounded-xl bg-ok px-6 py-3 text-base font-bold text-accent-fg shadow-lg transition hover:opacity-90 disabled:opacity-50 sm:flex-none"
               >
                 <Play className="h-5 w-5 fill-current" />
-                GO!
+                Run charter
               </button>
               <button
                 type="button"
@@ -238,7 +239,7 @@ function MasterDashboard() {
                 className="flex min-h-14 items-center justify-center gap-2 rounded-xl border border-border bg-surface-2 px-4 py-3 text-sm text-muted hover:text-fg disabled:opacity-50"
               >
                 <Eraser className="h-4 w-4" />
-                New game
+                Reset
               </button>
             </div>
 
@@ -252,7 +253,9 @@ function MasterDashboard() {
               >
                 <div className="mb-1 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide">
                   <Sparkles className="h-3.5 w-3.5" />
-                  {state.lastHit ? "Memory HIT — reused path" : "Quantum path"}
+                  {state.lastHit
+                    ? "Muscle-Memory HIT — verified path"
+                    : "Quantum path (collapsed)"}
                 </div>
                 <div className="font-mono text-sm text-fg">
                   {state.lastPath.join(" → ")}
@@ -261,12 +264,11 @@ function MasterDashboard() {
             )}
           </div>
 
-          {/* Console / blackboard */}
           <div className="flex h-80 flex-col rounded-xl border border-border bg-surface p-4 shadow-lg">
             <div className="mb-2 flex items-center justify-between">
               <h3 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted">
                 <span className="h-2 w-2 rounded-full bg-primary" />
-                Game Log (Blackboard)
+                System Blackboard / Telemetry
               </h3>
               <button
                 type="button"
@@ -290,7 +292,7 @@ function MasterDashboard() {
       </main>
 
       <footer className="border-t border-border py-3 text-center text-[11px] text-muted">
-        FlowChartCharter Game Desk · Muscle-Memory · Quantum Router · CFO Guard
+        FlowChartCharter · Muscle-Memory · Quantum Router · CFO Guardrail
       </footer>
     </div>
   );
@@ -318,7 +320,7 @@ function PlayerCard({ agent }: { agent: RosterAgent }) {
           </span>
         </div>
         <div className="mt-0.5 text-[11px] text-muted">
-          Wins {agent.success}/{agent.total} · Tokens {agent.tokens} · Oops{" "}
+          Success {agent.success}/{agent.total} · Tokens {agent.tokens} · Errors{" "}
           {agent.errors}
         </div>
       </div>
@@ -369,27 +371,25 @@ function Knob({
   );
 }
 
-function HowToPlay() {
+function HowToUse() {
   return (
     <div className="rounded-xl border border-border bg-surface p-4 text-xs text-muted">
       <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-fg">
         <ArrowRight className="h-4 w-4 text-ok" />
-        How to play
+        Quick start
       </div>
       <ol className="list-decimal space-y-1.5 pl-4">
+        <li>Choose a workload preset or type your own.</li>
         <li>
-          Pick a job chip (or type your own).
+          Press <strong className="text-ok">Run charter</strong>.
         </li>
         <li>
-          Press the big green <strong className="text-ok">GO!</strong>
+          <strong className="text-ok">HIT</strong> reuses Muscle-Memory ·{" "}
+          <strong className="text-primary">MISS</strong> collapses a new path.
         </li>
         <li>
-          Watch the log: <strong className="text-ok">HIT</strong> = free cheat
-          sheet · MISS = robots invent a path.
-        </li>
-        <li>
-          Press <strong className="text-primary">Monday Morning Sync</strong> to
-          promote stars and bench flops.
+          Use <strong className="text-primary">Monday Morning Sync</strong> to
+          promote or decommission agents.
         </li>
       </ol>
     </div>

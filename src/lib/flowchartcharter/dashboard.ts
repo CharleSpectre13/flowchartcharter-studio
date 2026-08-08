@@ -1,6 +1,6 @@
 /**
- * Master Dashboard game engine — Gemini reference + FlowChartCharter core.
- * Designed so a first-grader can run charters like a video game.
+ * Master Dashboard engine — Gemini reference + FlowChartCharter core.
+ * Simple control surface for charter execution, Muscle-Memory, and Monday Sync.
  */
 
 export type AgentStatus = "ACTIVE" | "PROMOTED" | "FIRED";
@@ -50,7 +50,6 @@ export interface DashboardState {
 let logSeq = 0;
 
 function stamp(): string {
-  // Avoid locale/time SSR mismatch — use step counter for display
   logSeq += 1;
   return `#${logSeq}`;
 }
@@ -123,7 +122,7 @@ export function createDashboard(): DashboardState {
         id: "boot",
         t: "#0",
         kind: "info",
-        text: "FlowChartCharter ready. Type a job and press GO!",
+        text: "FlowChartCharter ready. Enter a workload and run the charter.",
       },
     ],
     lastPath: null,
@@ -146,7 +145,6 @@ function pushLog(
   };
 }
 
-/** Muscle-Memory lookup — keyword overlap + entanglement threshold. */
 function queryMemory(
   memory: MemoryRecord[],
   workload: string,
@@ -169,7 +167,6 @@ function queryMemory(
   return best;
 }
 
-/** Execute one charter run — game loop step. */
 export function executeWorkload(state: DashboardState): DashboardState {
   let s: DashboardState = {
     ...state,
@@ -184,19 +181,19 @@ export function executeWorkload(state: DashboardState): DashboardState {
     `Job: "${s.workload}" | Entropy: ${s.entropy.toFixed(1)} | CFO: ${s.cfoBudget}`,
     "info",
   );
-  s = pushLog(s, "[Muscle-Memory] Searching past cheat sheets…", "info");
+  s = pushLog(s, "[Muscle-Memory] Querying past execution trajectories…", "info");
 
   const matched = queryMemory(s.memory, s.workload, s.threshold);
 
   if (matched) {
     s = pushLog(
       s,
-      `HIT! Found ${matched.id} — reusing proven path`,
+      `HIT — matched ${matched.id}; reusing verified path`,
       "success",
     );
     s = pushLog(s, `Path: ${matched.flowPath.join(" → ")}`, "success");
-    s = pushLog(s, `Cheat code: "${matched.tweak}"`, "success");
-    s = pushLog(s, "Done! Zero guesses. Super fast.", "success");
+    s = pushLog(s, `Prompt tweak: "${matched.tweak}"`, "success");
+    s = pushLog(s, "Execution complete — deterministic replay, low cost.", "success");
     const roster = s.roster.map((a) =>
       a.status === "FIRED"
         ? a
@@ -220,14 +217,14 @@ export function executeWorkload(state: DashboardState): DashboardState {
 
   s = pushLog(
     s,
-    `MISS — no match above ${s.threshold}. Opening Quantum Router…`,
+    `MISS — no trajectory above threshold ${s.threshold}. Quantum Router…`,
     "warning",
   );
 
   if (unitCost > s.cfoBudget) {
     s = pushLog(
       s,
-      `CFO STOP! Path costs ~${unitCost} tokens > budget ${s.cfoBudget}. Slide budget up or simplify the job.`,
+      `CFO INTERRUPT: estimated cost ~${unitCost} exceeds budget ${s.cfoBudget}. Raise ceiling or simplify.`,
       "error",
     );
     return {
@@ -239,14 +236,14 @@ export function executeWorkload(state: DashboardState): DashboardState {
     };
   }
 
-  s = pushLog(s, "Wave function collapsing… pick one sure path!", "info");
+  s = pushLog(s, "Wave function collapse at Rhythm Marker…", "info");
   let path: string[];
   if (s.entropy >= 0.7) {
     path = ["U1_Ingest", "U3_DataCleanse", "U9_DeterministicExecute"];
-    s = pushLog(s, "Messy data → cleansing path picked", "info");
+    s = pushLog(s, "High entropy → data-cleansing path selected", "info");
   } else {
     path = ["U1_Ingest", "U4_SchemaEnforce", "U9_DeterministicExecute"];
-    s = pushLog(s, "Clean data → standard path picked", "info");
+    s = pushLog(s, "Low entropy → standard path selected", "info");
   }
   s = pushLog(s, `Collapsed → ${path.join(" → ")}`, "success");
 
@@ -255,9 +252,9 @@ export function executeWorkload(state: DashboardState): DashboardState {
     jobType: s.workload,
     flowPath: path,
     entanglement: 0.96,
-    tweak: "Auto-saved for next time — your cheat sheet grows!",
+    tweak: "Auto-committed during live execution for future Muscle-Memory hits.",
   };
-  s = pushLog(s, `Saved ${newMem.id} to Muscle-Memory for next run`, "info");
+  s = pushLog(s, `Trajectory ${newMem.id} committed to Muscle-Memory DB`, "info");
 
   const roster = s.roster.map((a) => {
     if (a.status === "FIRED") return a;
@@ -282,7 +279,6 @@ export function executeWorkload(state: DashboardState): DashboardState {
   };
 }
 
-/** Monday Morning Sync — talent management game turn. */
 export function mondayMorningSync(state: DashboardState): DashboardState {
   let s: DashboardState = {
     ...state,
@@ -290,29 +286,29 @@ export function mondayMorningSync(state: DashboardState): DashboardState {
     logs: [...state.logs],
   };
   s = pushLog(s, "======== MONDAY MORNING SYNC ========", "info");
-  s = pushLog(s, "Boss Agent reviews the team…", "info");
+  s = pushLog(s, "Boss Agent reviewing telemetry…", "info");
 
   const roster: RosterAgent[] = s.roster.map((agent) => {
     if (agent.status === "FIRED") return agent;
     const score = fitnessScore(agent);
     s = pushLog(
       s,
-      `${agent.id} ${agent.role} score = ${score.toFixed(3)}`,
+      `${agent.id} ${agent.role} fitness = ${score.toFixed(3)}`,
       "info",
     );
     if (score < 0.7) {
-      s = pushLog(s, `FIRE ${agent.id} — below the bar`, "error");
+      s = pushLog(s, `FIRE ${agent.id} — below industry benchmark`, "error");
       return { ...agent, status: "FIRED" };
     }
     if (score > 0.9) {
-      s = pushLog(s, `PROMOTE ${agent.id} — star player!`, "success");
+      s = pushLog(s, `PROMOTE ${agent.id} — Key Player tier`, "success");
       return { ...agent, status: "PROMOTED" };
     }
-    s = pushLog(s, `KEEP ${agent.id} — solid`, "info");
+    s = pushLog(s, `RETAIN ${agent.id}`, "info");
     return { ...agent, status: "ACTIVE" };
   });
 
-  s = pushLog(s, "Sync done. Bar raised. Ready for more jobs!", "success");
+  s = pushLog(s, "Monday Morning Sync complete. Bar raised.", "success");
   return { ...s, roster, rhythm: "idle" };
 }
 
@@ -324,7 +320,7 @@ export function clearLogs(state: DashboardState): DashboardState {
         id: "cleared",
         t: "#0",
         kind: "info",
-        text: "Log cleared. Press GO to run a job!",
+        text: "Log cleared. Ready for the next charter.",
       },
     ],
   };

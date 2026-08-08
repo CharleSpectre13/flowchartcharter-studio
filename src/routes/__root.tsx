@@ -7,11 +7,11 @@ export const Route = createRootRoute({
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "FlowChartCharter Game Desk" },
+      { title: "FlowChartCharter Enterprise Engine" },
       {
         name: "description",
         content:
-          "Play FlowChartCharter — run agent charters like a video game. Muscle-Memory hits, quantum paths, Monday Sync.",
+          "FlowChartCharter Master Dashboard — Muscle-Memory retrieval, quantum path collapse, Monday Morning Sync.",
       },
     ],
     links: [
