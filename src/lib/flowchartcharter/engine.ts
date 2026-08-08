@@ -17,6 +17,33 @@ export interface Agent {
   corporateRank: number;
   load: number;
   capability: Record<string, number>;
+  talentEligible: boolean;
+  layer: "ops" | "exec" | "audit";
+}
+
+export type VectorType =
+  | "StrategyVector"
+  | "BudgetVector"
+  | "GovernanceVector"
+  | "OpsVector"
+  | "RhythmAudit";
+
+export interface ExecVector {
+  type: VectorType;
+  from?: string;
+  charter_id?: string;
+  marker?: string;
+  quality?: number;
+  threshold?: number;
+  passed?: boolean;
+  trust_signal?: boolean;
+  approve_hand_off?: boolean;
+  token_spend?: number;
+  token_budget?: number;
+  halt_if_over?: boolean;
+  notes?: string;
+  roster_outcomes?: Record<string, string>;
+  [key: string]: unknown;
 }
 
 export interface CharterRun {
@@ -26,15 +53,22 @@ export interface CharterRun {
   remediationLoops: number;
   pathByAgent: Record<string, string>;
   metrics: ExecutionMetrics[];
+  auditPassed: boolean;
+  governanceApproved: boolean;
+  vectors: ExecVector[];
 }
 
 export interface SystemSnapshot {
   roster: Agent[];
+  executives: { ceo: string; cfo: string; board: string; gm: string };
   runs: CharterRun[];
   syncOutcomes: Record<string, string>;
   playbook: string[];
+  vectors: ExecVector[];
   trustRate: number;
   step: number;
+  tokenSpend: number;
+  tokenBudget: number;
 }
 
 function uid() {
@@ -57,6 +91,8 @@ export function createRoster(): Agent[] {
       corporateRank: 1,
       load: 0,
       capability: { extraction: 1, general: 0.5 },
+      talentEligible: true,
+      layer: "ops",
     },
     {
       id: uid(),
@@ -68,6 +104,8 @@ export function createRoster(): Agent[] {
       corporateRank: 1,
       load: 0,
       capability: { validation: 1, general: 0.5 },
+      talentEligible: true,
+      layer: "ops",
     },
     {
       id: uid(),
@@ -79,20 +117,26 @@ export function createRoster(): Agent[] {
       corporateRank: 2,
       load: 0,
       capability: { synthesis: 1, general: 0.6 },
+      talentEligible: true,
+      layer: "ops",
     },
     {
       id: uid(),
-      name: "Auditor-1",
-      role: "Audit Manager",
+      name: "Validator-1",
+      role: "Rhythm Marker Validator",
       status: "Active",
       history: [],
       muscleMemory: { path_A: 1, path_B: 1 },
-      corporateRank: 3,
+      corporateRank: 4,
       load: 0,
       capability: { audit: 1, general: 0.4 },
+      talentEligible: false,
+      layer: "audit",
     },
   ];
 }
+
+const COST_NORM = 300;
 
 export function fitness(history: ExecutionMetrics[]): number {
   if (!history.length) return 0;
@@ -102,8 +146,7 @@ export function fitness(history: ExecutionMetrics[]): number {
   const c = history.reduce((s, m) => s + m.tokenCost, 0) / n;
   const sy = history.reduce((s, m) => s + m.synergyScore, 0) / n;
   const rhythm = t > 0 ? 1 / t : 0;
-  // Normalized cost term so short demos don't mass-fire
-  return 0.4 * q + 0.3 * rhythm - 0.0002 * c + 0.2 * sy;
+  return 0.4 * q + 0.3 * rhythm - 0.15 * (c / COST_NORM) + 0.2 * sy;
 }
 
 function pickPath(agent: Agent): string {
@@ -129,11 +172,46 @@ function executeUnit(agent: Agent, qualityBias = 0): ExecutionMetrics {
   return m;
 }
 
-export function runCharter(roster: Agent[], workload: string): CharterRun {
+function rhythmAudit(
+  charterId: string,
+  quality: number,
+  threshold: number,
+  loops: number,
+): ExecVector {
+  const passed = quality >= threshold && loops <= 3;
+  return {
+    type: "RhythmAudit",
+    marker: "gate",
+    charter_id: charterId,
+    quality: Number(quality.toFixed(4)),
+    threshold,
+    passed,
+    remediation_loops: loops,
+    blocking_issues: passed ? [] : [`quality ${quality.toFixed(3)} < ${threshold}`],
+  };
+}
+
+export function runCharter(
+  roster: Agent[],
+  workload: string,
+  prevVectors: ExecVector[],
+  tokenSpend: number,
+  tokenBudget: number,
+): { run: CharterRun; vectors: ExecVector[]; tokenSpend: number } {
+  const vectors: ExecVector[] = [...prevVectors];
+  vectors.push({
+    type: "StrategyVector",
+    from: "CEO",
+    charter_id: workload,
+    priority: 0.7,
+    budget_cap_tokens: tokenBudget,
+    quality_floor: 0.9,
+  });
+
   const metrics: ExecutionMetrics[] = [];
   const pathByAgent: Record<string, string> = {};
   for (const a of roster) {
-    if (a.status === "Fired" || a.role.includes("Audit")) continue;
+    if (a.status === "Fired" || a.layer !== "ops") continue;
     const path = pickPath(a);
     pathByAgent[a.name] = path;
     metrics.push(executeUnit(a));
@@ -142,36 +220,82 @@ export function runCharter(roster: Agent[], workload: string): CharterRun {
     ? metrics.reduce((s, m) => s + m.qualityScore, 0) / metrics.length
     : 0;
   let loops = 0;
-  while (quality < 0.9 && loops < 3) {
+  let audit = rhythmAudit(workload, quality, 0.9, loops);
+  vectors.push(audit);
+
+  while (!audit.passed && loops < 3) {
     loops += 1;
     const batch: ExecutionMetrics[] = [];
     for (const a of roster) {
-      if (a.status === "Fired" || a.role.includes("Audit")) continue;
+      if (a.status === "Fired" || a.layer !== "ops") continue;
       batch.push(executeUnit(a, 0.12));
     }
     metrics.push(...batch);
     quality = batch.reduce((s, m) => s + m.qualityScore, 0) / Math.max(batch.length, 1);
+    audit = rhythmAudit(workload, quality, 0.9, loops);
+    vectors.push(audit);
   }
+
+  const spend = metrics.reduce((s, m) => s + m.tokenCost, 0);
+  const nextSpend = tokenSpend + spend;
+  vectors.push({
+    type: "BudgetVector",
+    from: "CFO",
+    charter_id: workload,
+    token_spend: nextSpend,
+    token_budget: tokenBudget,
+    cost_penalty_gamma: 0.001,
+    halt_if_over: nextSpend > tokenBudget,
+  });
+
+  const trust = Boolean(audit.passed) && quality >= 0.9;
+  vectors.push({
+    type: "GovernanceVector",
+    from: "Board",
+    charter_id: workload,
+    trust_signal: trust,
+    approve_hand_off: trust,
+    notes: trust ? "hand-off approved" : "hand-off withheld",
+  });
+
   return {
-    workload,
-    quality,
-    trust: quality >= 0.9,
-    remediationLoops: loops,
-    pathByAgent,
-    metrics,
+    run: {
+      workload,
+      quality,
+      trust,
+      remediationLoops: loops,
+      pathByAgent,
+      metrics,
+      auditPassed: Boolean(audit.passed),
+      governanceApproved: trust,
+      vectors: vectors.slice(-6),
+    },
+    vectors,
+    tokenSpend: nextSpend,
   };
 }
 
-export function mondayMorningSync(roster: Agent[]): {
+export function mondayMorningSync(
+  roster: Agent[],
+  prevVectors: ExecVector[],
+  tokenSpend: number,
+  tokenBudget: number,
+  lastTrust: boolean,
+  lastQuality: number,
+): {
   outcomes: Record<string, string>;
   playbook: string[];
+  vectors: ExecVector[];
 } {
   const benchmark = 0.65;
   const outcomes: Record<string, string> = {};
   const playbook: string[] = [];
+  const fitnessSnap: Record<string, number> = {};
+
   for (const a of roster) {
-    if (a.role.includes("Boss")) continue;
+    if (!a.talentEligible || !a.history.length) continue;
     const f = fitness(a.history);
+    fitnessSnap[a.name] = Number(f.toFixed(4));
     if (f >= benchmark * 1.15) {
       a.status = "Promoted";
       a.corporateRank = Math.min(10, a.corporateRank + 1);
@@ -188,17 +312,61 @@ export function mondayMorningSync(roster: Agent[]): {
       playbook.push(`Retain ${a.name}: F=${f.toFixed(3)}`);
     }
   }
-  return { outcomes, playbook };
+
+  const vectors = [...prevVectors];
+  vectors.push({
+    type: "OpsVector",
+    from: "GM",
+    charter_id: "downtime-sync",
+    roster_outcomes: { ...outcomes },
+    fitness_snapshot: fitnessSnap,
+    playbook_updates: playbook.slice(0, 8),
+  });
+  vectors.push({
+    type: "StrategyVector",
+    from: "CEO",
+    charter_id: "downtime-sync",
+    priority: 0.6,
+    budget_cap_tokens: tokenBudget,
+    quality_floor: 0.9,
+  });
+  vectors.push({
+    type: "BudgetVector",
+    from: "CFO",
+    charter_id: "downtime-sync",
+    token_spend: tokenSpend,
+    token_budget: tokenBudget,
+    halt_if_over: tokenSpend > tokenBudget,
+  });
+  vectors.push({
+    type: "GovernanceVector",
+    from: "Board",
+    charter_id: "downtime-sync",
+    trust_signal: lastTrust,
+    approve_hand_off: lastTrust && lastQuality >= 0.9,
+    notes: lastTrust ? "fleet stable" : "review remediation",
+  });
+
+  return { outcomes, playbook, vectors };
 }
 
 export function initialSnapshot(): SystemSnapshot {
   return {
     roster: createRoster(),
+    executives: {
+      ceo: "CEO-Prime",
+      cfo: "CFO-Ledger",
+      board: "Board-Spectre",
+      gm: "Alpha-GM",
+    },
     runs: [],
     syncOutcomes: {},
     playbook: [],
+    vectors: [],
     trustRate: 0,
     step: 0,
+    tokenSpend: 0,
+    tokenBudget: 50_000,
   };
 }
 
@@ -206,7 +374,7 @@ export const PHASES = [
   { id: "ST-01", name: "Charter Init", marker: "start" },
   { id: "ST-02", name: "Voluntary Bind", marker: "bind" },
   { id: "ST-03", name: "Super-Step", marker: "superstep" },
-  { id: "ST-04", name: "Audit Gate", marker: "gate" },
+  { id: "ST-04", name: "Rhythm Audit", marker: "gate" },
   { id: "ST-05", name: "Muscle Memory", marker: "loop" },
   { id: "ST-06", name: "Coach Trust", marker: "handoff" },
   { id: "ST-07", name: "Monday Sync", marker: "sync" },
