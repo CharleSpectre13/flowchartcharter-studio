@@ -1,25 +1,26 @@
 # flowchartcharter-studio
 
-Interactive Studio for [FlowChartCharter v3.3](https://github.com/CharleSpectre13/flowchartcharter).
+> **This repository is a read-only redirect.**
 
-- Glanceable ST-01…ST-07 charter map
-- Multi-agent roster + fitness
-- Run charter → muscle-memory → Coach Trust Hand-Off
-- Harness: HALT, earned Rhythm, citation, QFS reduce
-- LiveModel: grok-4.5 when `XAI_API_KEY` is set; otherwise extractive/mock
+All Studio UI source now lives in the canonical monorepo:
 
-## Load the engine
+**https://github.com/CharleSpectre13/flowchartcharter/tree/main/studio**
+
+| What you want | Where it is now |
+|---|---|
+| Dashboard engine | `studio/src/lib/flowchartcharter/dashboard.ts` |
+| Tensor / Quantum engine | `studio/src/lib/flowchartcharter/engine.ts` |
+| Brain-1 ontology | `studio/src/lib/flowchartcharter/knowledge.ts` |
+| UI routes | `studio/src/routes/` |
+| Theme | `studio/src/styles.css` |
+| Python engine | `packages/core/flowchartcharter/` |
+
 ```bash
 pip install "git+https://github.com/CharleSpectre13/flowchartcharter.git"
-export XAI_API_KEY=...   # optional
-python3 -c "from flowchartcharter import LiveModel; print(LiveModel.from_env().status())"
+# optional live mouth
+export XAI_API_KEY=...
 ```
 
-## Stack
-TanStack Start + React + Tailwind v4 + lucide-react
-
-## Related
-- Core: https://github.com/CharleSpectre13/flowchartcharter
-- Loop: https://github.com/CharleSpectre13/flowchartcharter-loop
+Do not open PRs here. All new work lands on the main monorepo.
 
 Apache-2.0 · Spectre Industries open design
